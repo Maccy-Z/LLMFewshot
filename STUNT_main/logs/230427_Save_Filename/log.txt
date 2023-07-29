@@ -1,0 +1,9 @@
+[2023-04-27 18:29:34.720351] Namespace(baseline=False, batch_size=4, dataset='income', distributed=False, eval_step=50, load_path=None, lr=0.001, max_test_task=1000, mode='protonet', model='mlp', no_strict=False, num_shots=1, num_shots_global=0, num_shots_test=15, num_ways=10, outer_steps=10000, print_step=50, rank=0, regression=False, resume_path=None, save_step=2500, seed=0, suffix=None, test_batch_size=4, world_size=1)
+[2023-04-27 18:29:34.720437] MLPProto(
+  (encoder): Sequential(
+    (0): Linear(in_features=105, out_features=1024, bias=True)
+    (1): ReLU()
+    (2): Linear(in_features=1024, out_features=1024, bias=True)
+  )
+)
+Start training (./logs/230427_Save_Filename)
