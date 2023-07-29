@@ -1,0 +1,41 @@
+[NN_dims]
+set_h_dim = 64
+set_out_dim = 64
+d2v_layers = [ 4, 2, 4,]
+pos_depth = 2
+pos_enc_dim = 15
+weight_hid_dim = 64
+gen_layers = 1
+gat_heads = 1
+gat_layers = 2
+gat_hid_dim = 64
+gat_out_dim = 16
+weight_bias = "off"
+pos_enc_bias = "zero"
+norm_lin = true
+norm_weights = true
+learn_norm = true
+gat_in_dim = 16
+
+[Optim]
+lr = 0.0005
+eps = 0.0003
+decay = 0.0001
+
+[DL_params]
+bs = 3
+num_rows = 10
+num_targets = 15
+ds_group = [1, -1]
+binarise = true
+split_file = ""
+
+[Settings]
+num_epochs = 31
+val_duration = 200
+val_interval = 2000
+dataset = "total"
+
+[DL_params.num_cols]
+train = -2
+val = -2
