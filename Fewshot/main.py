@@ -367,12 +367,11 @@ def main(cfg2, device="cpu", nametag=None):
         save_holder.save_grads(save_grads)
 
 
-
 if __name__ == "__main__":
     torch.manual_seed(0)
     tag = ""  # input("Description: ")
 
-    for test_no in range(5):
+    for test_no in range(1):
         print("---------------------------------")
         print("Starting test number", test_no)
 
