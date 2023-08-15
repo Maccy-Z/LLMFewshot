@@ -17,7 +17,6 @@ from catboost import CatBoostClassifier, CatboostError
 from tab_transformer_pytorch import FTTransformer
 
 from main import *
-from dataloader import d2v_pairer
 from config import Config
 from precompute_batches import load_batch
 
@@ -35,16 +34,19 @@ class Model(ABC):
         xs_metas, ys_metas, xs_targets, ys_targets, _ = batch
         accs = []
 
+        batch_no = 0
         for xs_meta, xs_target, ys_meta, ys_target in zip(xs_metas, xs_targets, ys_metas, ys_targets):
             self.fit(xs_meta, ys_meta)
             a = self.get_acc(xs_target, ys_target)
 
             accs.append(a)
 
+            if batch_no > 2000:
+                break
+
         accs = np.concatenate(accs)
 
         mean, std = np.mean(accs), np.std(accs, ddof=1) / np.sqrt(accs.shape[0])
-
         return mean, std
 
     @abstractmethod
@@ -204,59 +206,59 @@ class Model(ABC):
 #         return "FTTransformer"
 #
 #
-# class BasicModel(Model):
-#     def __init__(self, name):
-#         match name:
-#             case "LR":
-#                 self.model = LogisticRegression(max_iter=1000)
-#             case "SVC":
-#                 self.model = SVC(C=10, kernel="sigmoid", gamma=0.02)
-#             case "KNN":
-#                 self.model = KNN(n_neighbors=2, p=1, weights="distance")
-#             case "CatBoost":
-#                 self.model = CatBoostClassifier(iterations=200, learning_rate=0.03, allow_const_label=True, verbose=False)
-#                 # iterations=20, depth=4, learning_rate=0.5,
-#                 #                             loss_function='Logloss', allow_const_label=True, verbose=False)
-#
-#             case "R_Forest":
-#                 self.model = RandomForestClassifier(n_estimators=150, n_jobs=5)
-#             case _:
-#                 raise Exception("Invalid model specified")
-#
-#         self.name = name
-#         self.identical_batch = False
-#
-#     def fit(self, xs_meta, ys_meta):
-#         ys_meta = ys_meta.flatten().numpy()
-#         xs_meta = xs_meta.numpy()
-#
-#         if ys_meta.min() == ys_meta.max():
-#             self.identical_batch = True
-#             self.pred_val = ys_meta[0]
-#         else:
-#             self.identical_batch = False
-#
-#             try:
-#                 self.model.fit(xs_meta, ys_meta)
-#                 # print(self.model.get_all_params())
-#                 # exit(2)
-#             except CatboostError:
-#                 # Catboost fails if every input element is the same
-#                 self.identical_batch = True
-#                 mode = stats.mode(ys_meta, keepdims=False)[0]
-#                 self.pred_val = mode
-#
-#     def get_acc(self, xs_target, ys_target):
-#         xs_target = xs_target.numpy()
-#         if self.identical_batch:
-#             predictions = np.ones_like(ys_target) * self.pred_val
-#         else:
-#             predictions = self.model.predict(xs_target)
-#
-#         return np.array(predictions).flatten() == np.array(ys_target)
-#
-#     def __repr__(self):
-#         return self.name
+class BasicModel(Model):
+    def __init__(self, name):
+        match name:
+            case "LR":
+                self.model = LogisticRegression(max_iter=1000)
+            case "SVC":
+                self.model = SVC(C=10, kernel="sigmoid", gamma=0.02)
+            case "KNN":
+                self.model = KNN(n_neighbors=2, p=1, weights="distance")
+            case "CatBoost":
+                self.model = CatBoostClassifier(iterations=200, learning_rate=0.03, allow_const_label=True, verbose=False)
+                # iterations=20, depth=4, learning_rate=0.5,
+                #                             loss_function='Logloss', allow_const_label=True, verbose=False)
+
+            case "R_Forest":
+                self.model = RandomForestClassifier(n_estimators=150, n_jobs=5)
+            case _:
+                raise Exception("Invalid model specified")
+
+        self.name = name
+        self.identical_batch = False
+
+    def fit(self, xs_meta, ys_meta):
+        ys_meta = ys_meta.flatten().numpy()
+        xs_meta = xs_meta.numpy()
+
+        if ys_meta.min() == ys_meta.max():
+            self.identical_batch = True
+            self.pred_val = ys_meta[0]
+        else:
+            self.identical_batch = False
+
+            try:
+                self.model.fit(xs_meta, ys_meta)
+                # print(self.model.get_all_params())
+                # exit(2)
+            except CatboostError:
+                # Catboost fails if every input element is the same
+                self.identical_batch = True
+                mode = stats.mode(ys_meta, keepdims=False)[0]
+                self.pred_val = mode
+
+    def get_acc(self, xs_target, ys_target):
+        xs_target = xs_target.numpy()
+        if self.identical_batch:
+            predictions = np.ones_like(ys_target) * self.pred_val
+        else:
+            predictions = self.model.predict(xs_target)
+
+        return np.array(predictions).flatten() == np.array(ys_target)
+
+    def __repr__(self):
+        return self.name
 
 
 class FLAT(Model):
@@ -285,8 +287,10 @@ class FLAT(Model):
         unique_labels = np.union1d(self.unique_ys_meta, unique_target)
         max_N_label = np.max(unique_labels) + 1
 
-        ys_pred_targ = self.model.forward_target([xs_target], self.pos_enc, max_N_label)
+        with torch.no_grad():
+            ys_pred_targ = self.model.forward_target([xs_target], self.pos_enc, max_N_label)
         predicted_labels = torch.argmax(ys_pred_targ, dim=1)
+
         return torch.eq(predicted_labels, ys_target).numpy()
 
     def __repr__(self):
@@ -368,6 +372,7 @@ def get_results_by_dataset(test_data_names, models, N_meta=10, N_target=5):
 
             model_acc_std[str(model)].append([mean_acc, std_acc])
 
+            # print(model.preds)
         for model_name, acc_stds in model_acc_std.items():
             acc_stds = np.array(acc_stds)
             # For baselines, variance is sample variance.
@@ -394,49 +399,7 @@ def get_results_by_dataset(test_data_names, models, N_meta=10, N_target=5):
     return results
 
 
-def main(load_no, N_meta):
-    dir_path = f'{BASEDIR}/saves'
-    files = [f for f in os.listdir(dir_path) if os.path.isdir(f'{dir_path}/{f}')]
-    existing_saves = sorted([int(f[5:]) for f in files if f.startswith("save")])  # format: save_{number}
-    load_no = [existing_saves[num] for num in load_no]
-
-    load_dir = f'{BASEDIR}/saves/save_{load_no[-1]}'
-
-    # result_dir = f'{BASEDIR}/Results'
-    # files = [f for f in os.listdir(result_dir) if os.path.isdir(f'{result_dir}/{f}')]
-    # existing_results = sorted([int(f) for f in files if f.isdigit()])
-    #
-    # print(existing_results)
-    # result_no = existing_results[-1] + 1
-    #
-    # result_dir = f'{result_dir}/{result_no}'
-    # print(result_dir)
-    # os.mkdir(result_dir)
-
-    split_name = "adult"
-    splits = toml.load(f'./datasets/splits/{split_name}')
-
-    test_splits = splits["test"]
-
-    # print("Train datases:", train_data_names)
-    print("Test datasets:", test_splits)
-
-    N_target = 5
-    cfg = Config()
-    cfg.N_meta = N_meta
-    cfg.N_target = N_target
-
-    models = [FLAT(num) for num in load_no] + []
-    # [FLAT_MAML(num) for num in load_no] + \
-    #  [
-    #  BasicModel("LR"), # BasicModel("CatBoost"), BasicModel("R_Forest"),  BasicModel("KNN"),
-    #  # TabnetModel(),
-    #  # FTTrModel(),
-    #  # STUNT(),
-    #  ]
-
-    test_results = get_results_by_dataset(test_splits, models, N_meta=N_meta, N_target=N_target)
-
+def process_results(test_results):
     # Results for each dataset
     detailed_results = test_results.copy()
 
@@ -508,6 +471,54 @@ def main(load_no, N_meta):
     #
     # with open(f'{result_dir}/raw.pkl', "wb") as f:
     #     pickle.dump(unseen_results, f)
+
+
+def main(load_no, N_meta):
+    dir_path = f'{BASEDIR}/saves'
+    files = [f for f in os.listdir(dir_path) if os.path.isdir(f'{dir_path}/{f}')]
+    existing_saves = sorted([int(f[5:]) for f in files if f.startswith("save")])  # format: save_{number}
+    load_no = [existing_saves[num] for num in load_no]
+
+    load_dir = f'{BASEDIR}/saves/save_{load_no[-1]}'
+
+    # result_dir = f'{BASEDIR}/Results'
+    # files = [f for f in os.listdir(result_dir) if os.path.isdir(f'{result_dir}/{f}')]
+    # existing_results = sorted([int(f) for f in files if f.isdigit()])
+    #
+    # print(existing_results)
+    # result_no = existing_results[-1] + 1
+    #
+    # result_dir = f'{result_dir}/{result_no}'
+    # print(result_dir)
+    # os.mkdir(result_dir)
+
+    split_name = "adult"
+    splits = toml.load(f'./datasets/splits/{split_name}')
+
+    test_splits = splits["test"]
+
+    # print("Train datases:", train_data_names)
+    print("Test datasets:", test_splits)
+
+    test_splits = ["adult"]
+
+    N_target = 5
+    cfg = Config()
+    cfg.N_meta = N_meta
+    cfg.N_target = N_target
+
+    models = [FLAT(num) for num in load_no] + [BasicModel("LR"), BasicModel("KNN")]
+    # [FLAT_MAML(num) for num in load_no] + \
+    #  [
+    #  BasicModel("LR"), # BasicModel("CatBoost"), BasicModel("R_Forest"),  BasicModel("KNN"),
+    #  # TabnetModel(),
+    #  # FTTrModel(),
+    #  # STUNT(),
+    #  ]
+
+    test_results = get_results_by_dataset(test_splits, models, N_meta=N_meta, N_target=N_target)
+
+    process_results(test_results)
 
 
 if __name__ == "__main__":

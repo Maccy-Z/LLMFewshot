@@ -190,7 +190,6 @@ class ProtoNet(nn.Module):
 
     # Given meta embeddings and labels, generate prototypes
     def gen_prototypes(self, xs_meta, ys_metas, pos_enc):
-
         embed_metas = self.to_embedding(xs_meta, pos_enc)
 
         # Seperate out batches
@@ -235,7 +234,6 @@ class ProtoNet(nn.Module):
 
             # Probs are in order of protos.keys(). Map to true classes.
             true_probs = torch.zeros([self.cfg.N_target, max_N_label], dtype=torch.float32)
-
             true_probs[:, labels] = probs
 
             all_probs.append(true_probs)
@@ -260,8 +258,6 @@ class ModelHolder(nn.Module):
         return pos_enc
 
     def forward_target(self, xs_target, pos_enc, max_N_label):
-        # weights_target = self.weight_model(embed_meta)
-        # preds_meta = self.gnn_model(xs_target, pos_enc)
         preds = self.protonet.forward(xs_target, pos_enc, max_N_label)
 
         return preds.view(-1, max_N_label)
@@ -366,7 +362,7 @@ if __name__ == "__main__":
     torch.manual_seed(0)
     tag = ""  # input("Description: ")
 
-    for test_no in range(5):
+    for test_no in range(1):
         print("---------------------------------")
         print("Starting test number", test_no)
 

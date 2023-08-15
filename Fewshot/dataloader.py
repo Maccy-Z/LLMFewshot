@@ -257,9 +257,11 @@ if __name__ == "__main__":
     cfg = Config()
     RNG = cfg.RNG
 
-    dl = SplitDataloader(cfg, bs=2, datasets="0", testing=False)
+    dl = SplitDataloader(cfg, bs=2, datasets=["abalone"], testing=True)
 
-    for mp, ml, tp, tl, datanames in islice(dl, 10):
+    print(dl.all_datasets[0].num_labels)
+
+    for mp, ml, tp, tl, datanames in islice(dl, 1):
         mp, ml = torch.stack(mp), torch.stack(ml)
         tp, tl = torch.stack(tp), torch.stack(tl)
         print(mp.shape, ml.shape)

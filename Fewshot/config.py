@@ -44,8 +44,9 @@ class Config:
     seed: int = 10
 
     # Optimiser parameters
-    lr: float = 5e-4
-    eps: float = 3e-4
+
+    lr: float = 5e-3  # 5e-4
+    eps: float = 3e-4  # 3e-4
     w_decay: float = 1e-4
 
     # Training duration
