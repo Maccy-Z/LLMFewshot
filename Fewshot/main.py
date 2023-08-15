@@ -10,8 +10,6 @@ from save_holder import SaveHolder
 from config import Config
 from dataloader import SplitDataloader, d2v_pairer
 
-cfg2 = Config()
-
 
 class ResBlock(nn.Module):
     def __init__(self, in_size, hid_size, out_size, n_blocks, out_relu=True):
@@ -114,7 +112,7 @@ class GNN2(nn.Module):
             self.gat_layers.append(pyg.nn.GATConv(gat_hid_dim * gat_heads, gat_hid_dim, heads=gat_heads))
         self.gat_layers.append(pyg.nn.GATConv(gat_hid_dim * gat_heads, gat_out_dim, heads=gat_heads))
 
-        self.lin_1 = torch.nn.Linear(gat_out_dim, cfg2.proto_dim)
+        self.lin_1 = torch.nn.Linear(gat_out_dim, cfg.proto_dim)
 
     # Generate additional fixed embeddings / graph
     def graph_matrix(self, N_rows, N_col):
@@ -181,6 +179,7 @@ class GNN2(nn.Module):
 class ProtoNet(nn.Module):
     def __init__(self, cfg):
         super().__init__()
+        self.cfg = cfg
         self.gnn_model = GNN2(cfg=cfg)
 
     # From observations, generates latent embeddings
@@ -235,7 +234,7 @@ class ProtoNet(nn.Module):
             probs = torch.nn.Softmax(dim=-1)(distances)
 
             # Probs are in order of protos.keys(). Map to true classes.
-            true_probs = torch.zeros([cfg2.N_target, max_N_label], dtype=torch.float32)
+            true_probs = torch.zeros([self.cfg.N_target, max_N_label], dtype=torch.float32)
 
             true_probs[:, labels] = probs
 
@@ -273,28 +272,26 @@ class ModelHolder(nn.Module):
         return cross_entropy
 
 
-def main(cfg2, device="cpu", nametag=None):
+def main(cfg, nametag=None):
     save_holder = None
 
-    dl = SplitDataloader(cfg2,
-                         bs=cfg2.bs, datasets=cfg2.ds_group, testing=False
-                         )
-    val_dl = SplitDataloader(cfg2,
-                             bs=1, datasets=cfg2.ds_group, testing=True
-                             )
+    dl = SplitDataloader(cfg,
+                         bs=cfg.bs, datasets=cfg.ds_group, testing=False)
+    val_dl = SplitDataloader(cfg,
+                             bs=1, datasets=cfg.ds_group, testing=True)
 
     print()
     print("Training data names:", dl)
     print("\nTest data names:", val_dl)
 
-    model = ModelHolder(cfg=cfg2)
+    model = ModelHolder(cfg=cfg)
 
-    optim = torch.optim.AdamW(model.parameters(), lr=cfg2.lr, eps=cfg2.eps, weight_decay=cfg2.w_decay)
+    optim = torch.optim.AdamW(model.parameters(), lr=cfg.lr, eps=cfg.eps, weight_decay=cfg.w_decay)
 
     accs, losses = [], []
     val_accs, val_losses = [], []
     st = time.time()
-    for epoch in range(cfg2.epochs):
+    for epoch in range(cfg.epochs):
         duration = time.time() - st
         st = time.time()
         print()
@@ -304,7 +301,7 @@ def main(cfg2, device="cpu", nametag=None):
 
         # Train loop
         model.train()
-        for xs_meta, ys_meta, xs_target, ys_target, max_N_label in itertools.islice(dl, cfg2.ep_len):
+        for xs_meta, ys_meta, xs_target, ys_target, max_N_label in itertools.islice(dl, cfg.ep_len):
             # First pass with the meta-set, train d2v and get embedding.
             pos_enc = model.forward_meta(xs_meta, ys_meta)
 
@@ -331,18 +328,16 @@ def main(cfg2, device="cpu", nametag=None):
                 for name, abs_grad in grads.items():
                     save_grads[name] += abs_grad
 
-        print(f"Training accuracy : {np.mean(accs[-cfg2.ep_len:]) * 100:.2f}%")
+        print(f"Training accuracy : {np.mean(accs[-cfg.ep_len:]) * 100:.2f}%")
 
         # Validation loop
         model.eval()
         epoch_accs, epoch_losses = [], []
-        for xs_meta, ys_meta, xs_target, ys_target, max_N_label in itertools.islice(dl, cfg2.ep_len):
-
+        for xs_meta, ys_meta, xs_target, ys_target, max_N_label in itertools.islice(dl, cfg.ep_len):
             with torch.no_grad():
                 pos_enc = model.forward_meta(xs_meta, ys_meta)
                 ys_pred_targ = model.forward_target(xs_target, pos_enc, max_N_label)
                 loss = model.loss_fn(ys_pred_targ, ys_target)
-
 
             # Accuracy recording
             ys_target = torch.cat(ys_target)
@@ -356,16 +351,15 @@ def main(cfg2, device="cpu", nametag=None):
 
         # Average gradients
         for name, abs_grad in save_grads.items():
-            save_grads[name] = torch.div(abs_grad, cfg2.ep_len)
+            save_grads[name] = torch.div(abs_grad, cfg.ep_len)
 
         # Save stats
         if save_holder is None:
-            save_holder = SaveHolder(".", nametag=nametag)
+            save_holder = SaveHolder(".", nametag=nametag, cfg=cfg)
         history = {"accs": accs, "loss": losses, "val_accs": val_accs, "val_loss": val_losses, "epoch_no": epoch}
         save_holder.save_model(model, optim, epoch=epoch)
         save_holder.save_history(history)
         save_holder.save_grads(save_grads)
-
 
 
 if __name__ == "__main__":
@@ -376,7 +370,7 @@ if __name__ == "__main__":
         print("---------------------------------")
         print("Starting test number", test_no)
 
-        main(cfg2=Config(), nametag=tag)
+        main(cfg=Config(), nametag=tag)
 
     print("")
     print(tag)

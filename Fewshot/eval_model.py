@@ -1,6 +1,6 @@
 # Evaluate models on batches. Do the actual accuracy evaluation.
 
-from config import get_config
+from config import load_config
 import os, toml, random, pickle, warnings
 import numpy as np
 from scipy import stats
@@ -54,6 +54,7 @@ class Model(ABC):
     @abstractmethod
     def get_acc(self, xs_target, ys_target) -> np.array:
         pass
+
 
 #
 # class STUNT(STUNT_utils, Model):
@@ -259,7 +260,7 @@ class Model(ABC):
 
 
 class FLAT(Model):
-    def __init__(self, load_no, cfg, save_ep=None):
+    def __init__(self, load_no, save_ep=None):
         save_dir = f'{BASEDIR}/saves/save_{load_no}'
         print(f'Loading model at {save_dir = }')
 
@@ -267,6 +268,8 @@ class FLAT(Model):
             state_dict = torch.load(f'{save_dir}/model.pt')
         else:
             state_dict = torch.load(f'{save_dir}/model_{save_ep}.pt')
+
+        cfg = load_config(f'{save_dir}/config.toml')
 
         self.model = ModelHolder(cfg=cfg)
         self.model.load_state_dict(state_dict['model_state_dict'])
@@ -276,7 +279,6 @@ class FLAT(Model):
 
         with torch.no_grad():
             self.pos_enc = self.model.forward_meta([xs_meta], [ys_meta])
-
 
     def get_acc(self, xs_target, ys_target) -> np.array:
         unique_target = np.unique(ys_target)
@@ -289,6 +291,7 @@ class FLAT(Model):
 
     def __repr__(self):
         return "FLAT"
+
 
 #
 # class FLAT_MAML(Model):
@@ -391,11 +394,12 @@ def get_results_by_dataset(test_data_names, models, N_meta=10, N_target=5):
     return results
 
 
-def main(load_no, N_meta, num_1s=None):
+def main(load_no, N_meta):
     dir_path = f'{BASEDIR}/saves'
     files = [f for f in os.listdir(dir_path) if os.path.isdir(f'{dir_path}/{f}')]
     existing_saves = sorted([int(f[5:]) for f in files if f.startswith("save")])  # format: save_{number}
     load_no = [existing_saves[num] for num in load_no]
+
     load_dir = f'{BASEDIR}/saves/save_{load_no[-1]}'
 
     # result_dir = f'{BASEDIR}/Results'
@@ -422,7 +426,7 @@ def main(load_no, N_meta, num_1s=None):
     cfg.N_meta = N_meta
     cfg.N_target = N_target
 
-    models = [FLAT(num, cfg=cfg) for num in load_no] + []
+    models = [FLAT(num) for num in load_no] + []
     # [FLAT_MAML(num) for num in load_no] + \
     #  [
     #  BasicModel("LR"), # BasicModel("CatBoost"), BasicModel("R_Forest"),  BasicModel("KNN"),
@@ -511,4 +515,4 @@ if __name__ == "__main__":
     np.random.seed(0)
     torch.manual_seed(0)
 
-    col_accs = main(load_no=[-1], N_meta=5)
+    main(load_no=[-1], N_meta=5)

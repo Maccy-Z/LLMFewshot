@@ -4,11 +4,12 @@ import pickle
 from matplotlib import pyplot as plt
 import shutil
 import numpy as np
+from config import save_config
 
 
 # Save into file. Automatically make a new folder for every new save.
 class SaveHolder:
-    def __init__(self, base_dir, nametag=None):
+    def __init__(self, base_dir, cfg, nametag=None):
         dir_path = f'{base_dir}/saves'
         files = [f for f in os.listdir(dir_path) if os.path.isdir(f'{dir_path}/{f}')]
         existing_saves = sorted([int(f[5:]) for f in files if f.startswith("save")])  # format: save_{number}
@@ -24,10 +25,11 @@ class SaveHolder:
         print(self.save_dir)
         os.mkdir(self.save_dir)
 
-        shutil.copy2(f'{base_dir}/Fewshot/defaults.toml', f'{self.save_dir}/defaults.toml')
         shutil.copy2(f'{base_dir}/Fewshot/config.py', f'{self.save_dir}/config.py')
+        save_config(cfg, f'{self.save_dir}/config.toml')
+
         if nametag is not None:
-            with open(f'{self.save_dir}/tag.txt', 'w') as f:
+            with open(f'{self.save_dir}/tag-{nametag}.txt', 'w') as f:
                 f.write(nametag)
 
         self.grads = []
@@ -40,8 +42,6 @@ class SaveHolder:
         if epoch % 10 == 0:
             torch.save({"model_state_dict": model.state_dict(),
                         "optim_state_dict": optim.state_dict()}, f'{self.save_dir}/model_{epoch}.pt')
-
-
 
     def save_history(self, hist_dict: dict):
         with open(f'{self.save_dir}/history.pkl', 'wb') as f:
@@ -132,12 +132,14 @@ if __name__ == "__main__":
     BASEDIR = "."
     SAVE_NO = 4
 
+
     def sort_key(filename):
         match = re.compile(r'(\d+)').search(filename)
         if match:
             return int(match.group(1))
         else:
             return filename
+
 
     saves = [f for f in os.listdir(f'{BASEDIR}/saves') if os.path.isdir(f'{BASEDIR}/saves/{f}')]
     saves = [f for f in saves if f.startswith("save_")]
@@ -147,4 +149,3 @@ if __name__ == "__main__":
     h = SaveLoader(save_dir=save_dir)
     h.plot_history()
     h.plot_grads()
-
