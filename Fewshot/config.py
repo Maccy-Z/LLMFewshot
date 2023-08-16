@@ -9,6 +9,23 @@ import toml
 
 @dataclasses.dataclass
 class Config:
+    # Dataloader properties
+    min_row_per_label: int = 20  # Minimum number of rows of a label
+    min_cols: int = 3  # Minimum number of dataset columns
+    max_labels: int = 10
+
+    fix_per_label: bool = True  # Fix N_meta per label instead of total
+    N_meta: int = 5  # N rows in meta
+    N_target: int = 5  # N rows in target
+
+    col_fmt: str = 'uniform'  # How to sample number of columns per batch
+    normalise: bool = True  # Normalise predictors
+
+    # Train DL params
+    DS_DIR: str = './datasets'
+    ds_group: str = '0'  # Datasets to sample from. List or filename
+    bs: int = 3
+
     # Model parameters
     proto_dim: int = 19
 
@@ -24,25 +41,8 @@ class Config:
     gat_out_dim: int = 16
     gat_layers: int = 2
 
-    # Dataloader properties
-    min_row_per_label: int = 20  # Minimum number of rows of a label
-    min_cols: int = 3  # Minimum number of dataset columns
-    max_cols: int = 10
-
-    fix_per_label: bool = True  # Fix N_meta per label instead of total
-    N_meta: int = 5  # N rows in meta
-    N_target: int = 5  # N rows in target
-
-    col_fmt: str = 'uniform'  # How to sample number of columns per batch
-    normalise: bool = True  # Normalise predictors
-
-    # Train DL params
-    DS_DIR: str = './datasets'
-    ds_group: str = '0'  # Datasets to sample from. List or filename
-    bs: int = 3
-
     # RNGs
-    seed: int = 10
+    seed: int = None
 
     # Optimiser parameters
 
@@ -58,9 +58,9 @@ class Config:
     def __post_init__(self):
         assert self.min_row_per_label >= self.N_meta + self.N_target
 
-        self.RNG = np.random.default_rng(seed=self.seed)
+        self.RNG = np.random.default_rng()
         self.T_RNG = torch.Generator()
-        self.T_RNG.manual_seed(self.seed)
+        #self.T_RNG.manual_seed()
 
 
 def save_config(cfg: Config, save_file):

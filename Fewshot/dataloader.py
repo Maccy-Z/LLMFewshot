@@ -43,12 +43,13 @@ def sample(n, k):
 class MyDataSet:
     cfg: Config
 
-    def __init__(self, cfg, ds_name, split, dtype=torch.float32, device="cpu"):
+    def __init__(self, cfg, ds_name, split, testing, dtype=torch.float32, device="cpu"):
         self.cfg, self.RNG = cfg, cfg.RNG
 
         self.ds_name = ds_name
         self.device = device
         self.dtype = dtype
+        self.testing = testing
 
         """
         Dataset format: {folder}_py.dat             predictors
@@ -128,24 +129,32 @@ class MyDataSet:
         # Columns to sample from
         pred_cols = self.RNG.choice(self.tot_cols - 1, size=N_cols, replace=False)
 
-        # Uniformly divide labels to fit n_meta / target.
         if self.cfg.fix_per_label:
             sample_meta = [self.cfg.N_meta for _ in range(self.num_labels)]
+            sample_target = [self.cfg.N_target for _ in range(self.num_labels)]
+        # Uniformly divide labels to fit n_meta / target.
         else:
             sample_meta = self.RNG.permutation(sample(self.cfg.N_meta, self.num_labels))
-        sample_target = self.RNG.permutation(sample(self.cfg.N_target, self.num_labels))
+            sample_target = self.RNG.permutation(sample(self.cfg.N_target, self.num_labels))
+
+        # Some datasets have too many labels
+        if not self.testing and self.num_labels > self.cfg.max_labels:
+            wanted_labels = self.RNG.permutation(list(self.data.keys()))[:self.cfg.max_labels]
+        else:
+            wanted_labels = list(self.data.keys())
 
         # Draw number of samples from each label.
         metas, targets = [], []
         for (label, label_rows), N_meta, N_target in zip(self.data.items(), sample_meta, sample_target, strict=True):
-            # Draw rows and shuffle to make meta and target batch
-            idx = torch.randperm(label_rows.size(0), generator=self.cfg.T_RNG)[: N_meta + N_target]
-            rows = label_rows[idx]
-            meta_rows = rows[:N_meta]
-            target_rows = rows[N_meta:]
+            if label in wanted_labels:
+                # Draw rows and shuffle to make meta and target batch
+                idx = torch.randperm(label_rows.size(0), generator=self.cfg.T_RNG)[: N_meta + N_target]
+                rows = label_rows[idx]
+                meta_rows = rows[:N_meta]
+                target_rows = rows[N_meta:]
 
-            metas.append(meta_rows)
-            targets.append(target_rows)
+                metas.append(meta_rows)
+                targets.append(target_rows)
 
         metas, targets = torch.cat(metas), torch.cat(targets)
         ys_meta, ys_target = metas[:, -1], targets[:, -1]
@@ -202,7 +211,7 @@ class SplitDataloader:
         self.all_datasets = []
         for ds_name in ds_names:
             try:
-                ds = MyDataSet(cfg, ds_name, device=self.device, split="all")
+                ds = MyDataSet(cfg, ds_name, testing=self.testing, device=self.device, split="all")
                 self.all_datasets.append(ds)
 
             except ValueError as e:
@@ -237,12 +246,6 @@ class SplitDataloader:
             xs_meta, ys_meta, xs_target, ys_target = list(zip(*[
                 ds.sample(N_cols=N_cols) for ds in sample_ds]))
 
-            # xs_meta, ys_meta = torch.stack(xs_meta), torch.stack(ys_meta)
-            # xs_target, ys_target = torch.stack(xs_target), torch.stack(ys_target)
-            #
-            # xs_meta, xs_target = to_tensor(meta_pred), to_tensor(target_pred)
-            # ys_meta, ys_target = to_tensor(meta_label, dtype=torch.int64), to_tensor(target_label, dtype=torch.int64)
-
             # Get maximum number of labels in batch
             max_N_label = max([d.max_labels for d in sample_ds])
             yield xs_meta, ys_meta, xs_target, ys_target, max_N_label
@@ -254,11 +257,12 @@ class SplitDataloader:
 if __name__ == "__main__":
     # torch.manual_seed(0)
     cfg = Config()
+    cfg.max_labels = 2
     RNG = cfg.RNG
 
-    dl = SplitDataloader(cfg, bs=2, datasets=["adult"], testing=True)
+    dl = SplitDataloader(cfg, bs=1, datasets=["abalone"], testing=True)
 
-    print(dl.all_datasets[0].num_labels)
+    # print(dl.all_datasets[0].num_labels)
 
     for mp, ml, tp, tl, datanames in islice(dl, 1):
         mp, ml = torch.stack(mp), torch.stack(ml)

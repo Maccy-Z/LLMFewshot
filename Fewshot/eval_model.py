@@ -40,9 +40,9 @@ class Model(ABC):
             a = self.get_acc(xs_target, ys_target)
 
             accs.append(a)
-
-            if batch_no > 2000:
-                break
+            #
+            # if batch_no > 2000:
+            #     break
 
         accs = np.concatenate(accs)
 

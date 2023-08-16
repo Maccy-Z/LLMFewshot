@@ -139,6 +139,7 @@ class GNN2(nn.Module):
         :param batch_pos_enc:         shape = [BS][N_row, enc_dim]
         :return output:               shape = [BS][N_row, N_col]
         """
+
         N_rows, batch_inputs = [], []
         for xs, pos_enc in zip(batch_xs, batch_pos_enc):
             N_row, N_col = xs.shape
@@ -208,7 +209,6 @@ class ProtoNet(nn.Module):
     # Compare targets to prototypes
     def forward(self, xs_targ, pos_enc, max_N_label):
         targ_embeds = self.to_embedding(xs_targ, pos_enc)
-
         # Loop over batches
         all_probs = []
         for protos, targ_embed in zip(self.batch_protos, targ_embeds, strict=True):
@@ -233,7 +233,7 @@ class ProtoNet(nn.Module):
             probs = torch.nn.Softmax(dim=-1)(distances)
 
             # Probs are in order of protos.keys(). Map to true classes.
-            true_probs = torch.zeros([self.cfg.N_target, max_N_label], dtype=torch.float32)
+            true_probs = torch.zeros([N_targs, max_N_label], dtype=torch.float32)
             true_probs[:, labels] = probs
 
             all_probs.append(true_probs)
