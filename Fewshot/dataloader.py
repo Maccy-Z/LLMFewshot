@@ -126,8 +126,8 @@ class MyDataSet:
 
     def sample(self, N_cols):
         # Columns to sample from
-
         pred_cols = self.RNG.choice(self.tot_cols - 1, size=N_cols, replace=False)
+
         # pred_cols = torch.randperm(self.tot_cols - 1)[:num_cols]
 
         # Uniformly divide labels to fit n_meta / target.
@@ -230,6 +230,7 @@ class SplitDataloader:
             elif self.cfg.col_fmt == 'uniform':
                 sample_ds = self.RNG.choice(self.all_datasets, size=self.bs)  # Allow repeats.
                 max_num_cols = min([d.tot_cols for d in sample_ds]) - 1
+                #print(max_num_cols)
                 N_cols = self.RNG.integers(2, max_num_cols)
 
             else:
@@ -257,7 +258,7 @@ if __name__ == "__main__":
     cfg = Config()
     RNG = cfg.RNG
 
-    dl = SplitDataloader(cfg, bs=2, datasets=["abalone"], testing=True)
+    dl = SplitDataloader(cfg, bs=2, datasets=["adult"], testing=True)
 
     print(dl.all_datasets[0].num_labels)
 

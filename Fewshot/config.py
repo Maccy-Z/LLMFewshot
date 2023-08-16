@@ -25,7 +25,7 @@ class Config:
     gat_layers: int = 2
 
     # Dataloader properties
-    min_row_per_label: int = 15  # Minimum number of rows of a label
+    min_row_per_label: int = 20  # Minimum number of rows of a label
     min_cols: int = 3  # Minimum number of dataset columns
 
     fix_per_label: bool = True  # Fix N_meta per label instead of total
