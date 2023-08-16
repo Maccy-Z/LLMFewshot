@@ -27,6 +27,7 @@ class Config:
     # Dataloader properties
     min_row_per_label: int = 20  # Minimum number of rows of a label
     min_cols: int = 3  # Minimum number of dataset columns
+    max_cols: int = 10
 
     fix_per_label: bool = True  # Fix N_meta per label instead of total
     N_meta: int = 5  # N rows in meta

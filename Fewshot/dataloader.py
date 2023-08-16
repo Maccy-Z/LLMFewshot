@@ -128,8 +128,6 @@ class MyDataSet:
         # Columns to sample from
         pred_cols = self.RNG.choice(self.tot_cols - 1, size=N_cols, replace=False)
 
-        # pred_cols = torch.randperm(self.tot_cols - 1)[:num_cols]
-
         # Uniformly divide labels to fit n_meta / target.
         if self.cfg.fix_per_label:
             sample_meta = [self.cfg.N_meta for _ in range(self.num_labels)]
