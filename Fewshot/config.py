@@ -54,9 +54,9 @@ class Config:
     def __post_init__(self):
         assert self.min_row_per_label >= self.N_meta + self.N_target
 
-        self.RNG = np.random.default_rng(seed=self.seed)
+        self.RNG = np.random.default_rng()
         self.T_RNG = torch.Generator()
-        self.T_RNG.manual_seed(self.seed)
+        #self.T_RNG.manual_seed(self.seed)
 
 
 def get_config(cfg_file=None):
