@@ -359,7 +359,7 @@ def main(cfg, nametag=None):
 
 
 if __name__ == "__main__":
-    torch.manual_seed(0)
+    # torch.manual_seed(0)
     tag = ""  # input("Description: ")
 
     for test_no in range(1):
