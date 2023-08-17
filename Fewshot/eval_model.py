@@ -17,15 +17,14 @@ from catboost import CatBoostClassifier, CatboostError
 from tab_transformer_pytorch import FTTransformer
 
 from main import *
-from config import Config
+from config import Config, load_config
 from precompute_batches import load_batch
-
-import sys
 
 # sys.path.append('/mnt/storage_ssd/fewshot_learning/FairFewshot/STUNT_main')
 # from STUNT_interface import STUNT_utils, MLPProto
 
 BASEDIR = '.'
+max_batches = 50
 
 
 class Model(ABC):
@@ -33,20 +32,21 @@ class Model(ABC):
     def get_accuracy(self, batch):
         xs_metas, ys_metas, xs_targets, ys_targets, _ = batch
         accs = []
-
         batch_no = 0
         for xs_meta, xs_target, ys_meta, ys_target in zip(xs_metas, xs_targets, ys_metas, ys_targets):
             self.fit(xs_meta, ys_meta)
             a = self.get_acc(xs_target, ys_target)
 
             accs.append(a)
-            #
-            # if batch_no > 2000:
-            #     break
+
+            batch_no += 1
+            if batch_no > max_batches:
+                break
 
         accs = np.concatenate(accs)
 
         mean, std = np.mean(accs), np.std(accs, ddof=1) / np.sqrt(accs.shape[0])
+
         return mean, std
 
     @abstractmethod
@@ -276,27 +276,41 @@ class FLAT(Model):
         self.model = ModelHolder(cfg=cfg)
         self.model.load_state_dict(state_dict['model_state_dict'])
 
+    def get_accuracy(self, batch):
+        xs_metas, ys_metas, xs_targets, ys_targets, _ = batch
+        accs = []
+
+        xs_metas, ys_metas, xs_targets, ys_targets = xs_metas[:max_batches+1], ys_metas[:max_batches+1], xs_targets[:max_batches+1], ys_targets[:max_batches+1]
+        self.fit(xs_metas, ys_metas)
+        a = self.get_acc(xs_targets, ys_targets)
+        accs.append(a)
+
+        accs = np.concatenate(accs)
+
+        mean, std = np.mean(accs), np.std(accs, ddof=1) / np.sqrt(accs.shape[0])
+
+        return mean, std
+
     def fit(self, xs_meta, ys_meta):
         self.unique_ys_meta = np.unique(ys_meta)
 
         with torch.no_grad():
-            self.pos_enc = self.model.forward_meta([xs_meta], [ys_meta])
+            self.pos_enc = self.model.forward_meta(xs_meta, ys_meta)
 
     def get_acc(self, xs_target, ys_target) -> np.array:
+
         unique_target = np.unique(ys_target)
         unique_labels = np.union1d(self.unique_ys_meta, unique_target)
         max_N_label = np.max(unique_labels) + 1
 
         with torch.no_grad():
-            ys_pred_targ = self.model.forward_target([xs_target], self.pos_enc, max_N_label)
+            ys_pred_targ = self.model.forward_target(xs_target, self.pos_enc, max_N_label)
         predicted_labels = torch.argmax(ys_pred_targ, dim=1)
 
-        return torch.eq(predicted_labels, ys_target).numpy()
+        return torch.eq(predicted_labels, ys_target.flatten()).numpy()
 
     def __repr__(self):
         return "FLAT"
-
-
 #
 # class FLAT_MAML(Model):
 #     def __init__(self, load_no, save_ep=None):
@@ -492,22 +506,20 @@ def main(load_no, N_meta):
     # print(result_dir)
     # os.mkdir(result_dir)
 
-    split_name = "adult"
+    split_name = "0"
     splits = toml.load(f'./datasets/splits/{split_name}')
 
     test_splits = splits["test"]
-
+    test_splits.remove("semeion")
     # print("Train datases:", train_data_names)
     print("Test datasets:", test_splits)
 
-    test_splits = ["adult"]
-
     N_target = 5
-    cfg = Config()
+    cfg = load_config(f'{load_dir}/config.toml')#Config()
     cfg.N_meta = N_meta
     cfg.N_target = N_target
 
-    models = [FLAT(num) for num in load_no] + [BasicModel("LR"), BasicModel("KNN")]
+    models = [FLAT(num) for num in load_no] + [BasicModel("LR"), BasicModel("R_Forest")]
     # [FLAT_MAML(num) for num in load_no] + \
     #  [
     #  BasicModel("LR"), # BasicModel("CatBoost"), BasicModel("R_Forest"),  BasicModel("KNN"),

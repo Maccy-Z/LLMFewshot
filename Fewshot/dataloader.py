@@ -236,9 +236,9 @@ class SplitDataloader:
 
             elif self.cfg.col_fmt == 'uniform':
                 sample_ds = self.RNG.choice(self.all_datasets, size=self.bs)  # Allow repeats.
-                max_num_cols = min([d.tot_cols for d in sample_ds]) - 1
+                max_num_cols = min([d.tot_cols for d in sample_ds])# - 1
                 #print(max_num_cols)
-                N_cols = self.RNG.integers(2, max_num_cols)
+                N_cols = self.RNG.integers(3, max_num_cols)
 
             else:
                 raise Exception("Invalid num_cols")

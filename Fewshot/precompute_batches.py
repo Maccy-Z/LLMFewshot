@@ -87,7 +87,7 @@ def save_batch(cfg, ds_name, num_batches):
 def main():
     datasets = sorted([f for f in os.listdir(data_dir) if os.path.isdir(f'{data_dir}/{f}')])
     #datasets = ["semeion"]
-    N_batches = 2000
+    N_batches = 1000
     for ds in datasets:
         for N_meta in [1, 2, 3, 5, 7]:
             print(f'{ds =}, {N_meta = }')

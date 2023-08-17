@@ -329,7 +329,7 @@ def main(cfg, nametag=None):
         # Validation loop
         model.eval()
         epoch_accs, epoch_losses = [], []
-        for xs_meta, ys_meta, xs_target, ys_target, max_N_label in itertools.islice(dl, cfg.ep_len):
+        for xs_meta, ys_meta, xs_target, ys_target, max_N_label in itertools.islice(dl, cfg.val_len):
             with torch.no_grad():
                 pos_enc = model.forward_meta(xs_meta, ys_meta)
                 ys_pred_targ = model.forward_target(xs_target, pos_enc, max_N_label)
