@@ -12,7 +12,7 @@ class Config:
     # Dataloader properties
     min_row_per_label: int = 20  # Minimum number of rows of a label
     min_cols: int = 3  # Minimum number of dataset columns
-    max_labels: int = 10
+    max_labels: int = 25
 
     fix_per_label: bool = True  # Fix N_meta per label instead of total
     N_meta: int = 5  # N rows in meta
@@ -27,7 +27,7 @@ class Config:
     bs: int = 8
 
     # Model parameters
-    proto_dim: int = 16
+    proto_dim: int = 256
 
     d2v_h_dim: int = 64
     f_depth: int = 4
@@ -35,19 +35,18 @@ class Config:
     pos_enc_dim: int = 15
     pos_enc_depth: int = 2
 
-    gat_heads: int = 1
-    gat_hid_dim: int = 64
+    gat_heads: int = 4
+    gat_hid_dim: int = 32
     gat_in_dim: int = pos_enc_dim + 1
-    gat_out_dim: int = 16
+    gat_out_dim: int = 32
     gat_layers: int = 2
 
     # RNGs
     seed: int = None
 
     # Optimiser parameters
-
-    lr: float = 5e-4  # 5e-4
-    eps: float = 3e-4  # 3e-4
+    lr: float = 3e-4  # 5e-4
+    eps: float = 0.1e-4  # 3e-4
     w_decay: float = 1e-4
 
     # Training duration

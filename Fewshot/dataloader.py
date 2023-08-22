@@ -138,8 +138,8 @@ class MyDataSet:
             sample_target = self.RNG.permutation(sample(self.cfg.N_target, self.num_labels))
 
         # Some datasets have too many labels
-        if not self.testing and self.num_labels > self.cfg.max_labels:
-            wanted_labels = self.RNG.permutation(list(self.data.keys()))[:self.cfg.max_labels]
+        if not self.testing:
+            wanted_labels = self.RNG.permutation(list(self.data.keys()))[:self.RNG.integers(2, self.cfg.max_labels)]
         else:
             wanted_labels = list(self.data.keys())
 

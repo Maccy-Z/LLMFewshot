@@ -24,7 +24,7 @@ from precompute_batches import load_batch
 # from STUNT_interface import STUNT_utils, MLPProto
 
 BASEDIR = '.'
-max_batches = 50
+max_batches = 40
 
 
 class Model(ABC):
@@ -280,7 +280,8 @@ class FLAT(Model):
         xs_metas, ys_metas, xs_targets, ys_targets, _ = batch
         accs = []
 
-        xs_metas, ys_metas, xs_targets, ys_targets = xs_metas[:max_batches+1], ys_metas[:max_batches+1], xs_targets[:max_batches+1], ys_targets[:max_batches+1]
+        xs_metas, ys_metas, xs_targets, ys_targets = xs_metas[:max_batches + 1], ys_metas[:max_batches + 1], xs_targets[:max_batches + 1], ys_targets[
+                                                                                                                                           :max_batches + 1]
         self.fit(xs_metas, ys_metas)
         a = self.get_acc(xs_targets, ys_targets)
         accs.append(a)
@@ -311,6 +312,8 @@ class FLAT(Model):
 
     def __repr__(self):
         return "FLAT"
+
+
 #
 # class FLAT_MAML(Model):
 #     def __init__(self, load_no, save_ep=None):
@@ -369,7 +372,7 @@ def get_results_by_dataset(test_data_names, models, N_meta=10, N_target=5):
     Results are groupped by: data set, model, number of test columns.
     """
 
-    results = pd.DataFrame(columns=['data_name', 'model', 'num_cols', 'acc', 'std'])
+    results = pd.DataFrame(columns=['data_name', 'model', 'acc', 'std'])
 
     # Test on full dataset
     for data_name in test_data_names:
@@ -403,7 +406,6 @@ def get_results_by_dataset(test_data_names, models, N_meta=10, N_target=5):
             result = pd.DataFrame({
                 'data_name': data_name,
                 'model': str(model_name),
-                'num_cols': -1,
                 'acc': mean_acc,
                 'std': std_acc
             }, index=[0])
@@ -421,19 +423,41 @@ def process_results(test_results):
     mean_std = [f'{m * 100:.2f}±{s * 100:.2f}' for m, s in zip(mean, std)]
     detailed_results['acc_std'] = mean_std
 
-    results = detailed_results.pivot(columns=['data_name', 'model'], index='num_cols', values=['acc_std'])
+    results = detailed_results.pivot(columns=['data_name'], index='model', values=['acc_std'])
     print("\n======================================================")
     print("Accuracy")
     print(results.to_string())
 
-    det_results = detailed_results.pivot(columns=['data_name', 'model'], index='num_cols', values=['acc'])
+    det_results = detailed_results.pivot(columns=['data_name'], index='model', values=['acc'])
     det_results = det_results.to_string()
 
     # Aggreate results
     agg_results = test_results.copy()
+    print(test_results)
+
+    def combine_stddev(series):
+        return np.sqrt((series ** 2).sum()) / len(series)
 
     # Move flat to first column
-    agg_results = agg_results.groupby(['num_cols', 'model'])['acc'].mean().unstack()
+    mean_acc = agg_results.groupby('model')['acc'].mean()
+    std_acc = agg_results.groupby('model')['std'].agg(combine_stddev)
+    mean_acc = pd.concat([mean_acc, std_acc], axis=1)
+
+    best_baseline_acc = mean_acc.drop("FLAT").max()
+
+    flat_diff = mean_acc.loc["FLAT"]["acc"] - best_baseline_acc["acc"]
+    flat_diff = pd.DataFrame({"acc": flat_diff, 'std': None}, index=['FLAT diff'])
+
+    mean_acc = pd.concat([flat_diff, mean_acc])
+
+    # print()
+    print()
+    print("======================================================")
+    print("Accuracy (aggregated)")
+    print(mean_acc.to_string())
+
+    exit(5)
+
     new_column_order = ["FLAT", "FLAT_maml"] + [col for col in agg_results.columns if (col != "FLAT" and col != "FLAT_maml")]
     agg_results = agg_results.reindex(columns=new_column_order)
 
@@ -509,13 +533,15 @@ def main(load_no, N_meta):
     split_name = "0"
     splits = toml.load(f'./datasets/splits/{split_name}')
 
-    test_splits = splits["test"]
-    test_splits.remove("semeion")
+    test_datasets = splits["test"]
+    test_datasets.remove("semeion")
     # print("Train datases:", train_data_names)
-    print("Test datasets:", test_splits)
+    print("Test datasets:", test_datasets)
+
+    # test_datasets = ["adult"]
 
     N_target = 5
-    cfg = load_config(f'{load_dir}/config.toml')#Config()
+    cfg = load_config(f'{load_dir}/config.toml')  # Config()
     cfg.N_meta = N_meta
     cfg.N_target = N_target
 
@@ -528,7 +554,7 @@ def main(load_no, N_meta):
     #  # STUNT(),
     #  ]
 
-    test_results = get_results_by_dataset(test_splits, models, N_meta=N_meta, N_target=N_target)
+    test_results = get_results_by_dataset(test_datasets, models, N_meta=N_meta, N_target=N_target)
 
     process_results(test_results)
 
@@ -539,3 +565,5 @@ if __name__ == "__main__":
     torch.manual_seed(0)
 
     main(load_no=[-1], N_meta=5)
+
+    # -1        58.34±0.34        NaN  64.27±0.33  64.18±0.33     -5.93            nan

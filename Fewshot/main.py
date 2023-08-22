@@ -112,7 +112,7 @@ class GNN2(nn.Module):
             self.gat_layers.append(pyg.nn.GATConv(gat_hid_dim * gat_heads, gat_hid_dim, heads=gat_heads))
         self.gat_layers.append(pyg.nn.GATConv(gat_hid_dim * gat_heads, gat_out_dim, heads=gat_heads))
 
-        self.lin_1 = torch.nn.Linear(gat_out_dim, cfg.proto_dim)
+        self.lin_1 = torch.nn.Linear(gat_out_dim * gat_heads, cfg.proto_dim)
 
     # Generate additional fixed embeddings / graph
     def graph_matrix(self, N_rows, N_col):
