@@ -103,10 +103,14 @@ def eval_ordering(col_no):
 
     ys = ds.num_data[:, -1]
 
+    print(ds.col_headers[col_no])
     print()
     print("Baseline")
     xs_raw = ds.num_data[:, col_no]
     LR_acc(xs_raw, ys)
+
+    if col_no not in ds.ordered_labels.keys():
+        return
 
     print()
     print("Ordered")
@@ -127,4 +131,4 @@ def eval_ordering(col_no):
 
 
 if __name__ == "__main__":
-    eval_ordering(1)
+    eval_ordering(3)
