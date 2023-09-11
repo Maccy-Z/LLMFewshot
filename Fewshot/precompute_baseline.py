@@ -3,7 +3,7 @@ import pickle
 import os
 import csv
 
-from eval_model import TabnetModel, FTTrModel, BasicModel, STUNT
+from baselines import TabnetModel, FTTrModel, BasicModel, STUNT
 from dataloader import SplitDataloader
 from precompute_batches import load_batch
 data_dir = './datasets/data'
