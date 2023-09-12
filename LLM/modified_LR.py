@@ -1,23 +1,23 @@
 import numpy as np
-from scipy.optimize import minimize
-from sklearn.datasets import make_classification
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, confusion_matrix, roc_auc_score
 import torch
 import torch.nn as nn
 
+from baselines import Model
 
-class TorchLogReg(nn.Module):
+
+class TorchLogReg(nn.Module, Model):
     loss_fn: nn.BCELoss
     linear: nn.Module
     optimizer: torch.optim.Optimizer
 
-    def __init__(self, fit_intercept, lr=0.01, steps=100, bias: float | torch.Tensor = 0., lam=0.):
+    def __init__(self, fit_intercept, lr=0.01, steps=100, bias: float | torch.Tensor = 0., lam=0., mask=0.):
         super().__init__()
         self.fit_intercept = fit_intercept
         self.steps = steps
         self.lr = lr
-        self.bias, self.lam = bias, lam
+        self.bias, self.lam, self.mask = bias, lam, mask
 
     def forward(self, x):
         return torch.sigmoid(self.linear(x))
@@ -36,6 +36,7 @@ class TorchLogReg(nn.Module):
         weight_neg = tot / (2 * num_neg + 1e-4)
         weight_pos = tot / (2 * num_pos + 1e-4)
         weights = torch.where(ys_meta == 1, weight_pos, weight_neg)
+        #weights = torch.ones_like(weights)
 
         self.loss_fn = nn.BCELoss(weight=weights)
         self.linear = nn.Linear(dims[1], 1, bias=self.fit_intercept)
@@ -56,14 +57,12 @@ class TorchLogReg(nn.Module):
         self.optimizer.zero_grad()
         preds = self.forward(self.xs_meta)
 
-        # print(preds, ys_meta)
-
         loss = self.loss_fn(preds, self.ys_meta) + self.lam * self._reg_loss()
         loss.backward()
         return loss
 
     def _reg_loss(self):
-        reg_loss = torch.linalg.norm(self.linear.weight - self.bias) ** 2
+        reg_loss = torch.linalg.norm((self.linear.weight - self.bias) * self.mask) ** 2
 
         return reg_loss
 
@@ -72,49 +71,19 @@ class TorchLogReg(nn.Module):
         with torch.no_grad():
             preds = self.forward(xs_target)
 
-        return preds > 0.5
+        return preds > 0.5, preds
 
+    def get_acc(self, xs_target, ys_target):
+        y_pred, y_probs = self.predict(xs_target)
 
-# Logistic Regression Model
-class LogisticRegression:
-    def __init__(self, fit_intercept=True, bias=0., lam=0.):
-        self.fit_intercept = fit_intercept
-        self.beta = None
-        self.bias = bias
-        self.lam = lam
+        # Metrics
+        accuracy = accuracy_score(ys_target, y_pred)
+        auc = roc_auc_score(ys_target, y_probs)
 
-    def add_intercept(self, X):
-        intercept = np.ones((X.shape[0], 1))
-        return np.concatenate((intercept, X), axis=1)
+        return accuracy, auc
 
-    def sigmoid(self, z):
-        return 1 / (1 + np.exp(-z))
-
-    def cost_function(self, beta, X, y, bias):
-        m = len(y)
-        p = self.sigmoid(X @ beta)
-        epsilon = 1e-5
-        cost = -(1 / m) * (y.T @ np.log(p + epsilon) + (1 - y).T @ np.log(1 - p + epsilon)) + self.lam * np.linalg.norm(bias - beta)
-        return cost
-
-    def fit(self, X, y):
-        if self.fit_intercept:
-            X = self.add_intercept(X)
-
-        # Initialize beta
-        self.beta = np.zeros(X.shape[1])
-
-        # Optimize using L-BFGS optimizer
-        result = minimize(self.cost_function, self.beta, args=(X, y, 0), method='L-BFGS-B')
-        self.beta = result.x
-
-    def predict_proba(self, X):
-        if self.fit_intercept:
-            X = self.add_intercept(X)
-        return self.sigmoid(X @ self.beta)
-
-    def predict(self, X, threshold=0.5):
-        return (self.predict_proba(X) >= threshold).astype(int)
+    def get_accuracy(self, batch):
+        raise NotImplementedError
 
 
 def probit(x):

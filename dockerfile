@@ -17,6 +17,7 @@ RUN pip install tab-transformer-pytorch catboost networkx[default]
 RUN pip install seaborn
 RUN pip install toml
 
+RUN pip install torchdiffeq
 
 
 

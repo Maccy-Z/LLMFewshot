@@ -1,6 +1,5 @@
 # Evaluate models on batches. Do the actual accuracy evaluation.
 
-from config import load_config
 import os, toml, random, pickle, warnings
 import numpy as np
 from scipy import stats
