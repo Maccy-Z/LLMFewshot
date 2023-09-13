@@ -3,9 +3,9 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_auc_score
 import torch
 
-from modified_LR import TorchLogReg
+from modified_LR import LogRegBias
 from baselines import BasicModel
-from datasets import Adult, Dataset
+from datasets import Dataset, Adult, Bank
 
 
 def base_acc(xs, ys, train_size, seed):
@@ -35,7 +35,7 @@ def LR_acc(xs, ys, train_size, seed, lam=0., bias: torch.Tensor = None, mask: to
 
     X_train, X_test, y_train, y_test = train_test_split(xs, ys, train_size=train_size, random_state=seed, stratify=ys)
 
-    clf = TorchLogReg(fit_intercept=True, lam=lam, bias=bias, mask=mask)
+    clf = LogRegBias(fit_intercept=True, lam=lam, bias=bias, mask=mask)
     clf.fit(X_train, y_train)
     acc, auc = clf.get_acc(X_test, y_test)
     print(f'Accuracy: {acc:.3g}, {auc = :.3g}')
@@ -78,13 +78,13 @@ def eval_ordering(ds, col_no, train_size, seed):
 
 if __name__ == "__main__":
 
-    ds = Adult()
+    ds = Bank()
     dl = Dataset(ds)
-    cols = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+    cols = range(16)
     print("Using columns:", ds.col_headers[cols])
 
     accs, aucs = [], []
-    for s in range(5):
+    for s in range(10):
         print()
         acc, auc = eval_ordering(dl, cols, train_size=10, seed=s)
         accs.append(acc), aucs.append(auc)

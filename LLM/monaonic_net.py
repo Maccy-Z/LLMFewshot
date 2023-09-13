@@ -14,9 +14,11 @@ class MLP(nn.Module):
         self.fc1 = nn.Linear(input_size, hidden_size)
         self.fc2 = nn.Linear(hidden_size, output_size)
         self.fc2.bias.data.fill_(0.0)
+        self.fc2.weight.data.fill_(0.0)
+        self.act = torch.nn.ELU()
 
     def forward(self, x):
-        x = torch.relu(self.fc1(x))
+        x = self.act(self.fc1(x))
         x = self.fc2(x)
         return x
 
@@ -30,32 +32,26 @@ class MonatoneNet(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
         super().__init__()
         self.mlp_model = MLP(input_size, hidden_size, output_size)
-        self.init_param = torch.nn.Parameter(torch.tensor([0.]), requires_grad=True)
+        self.init_param = torch.nn.Parameter(torch.tensor([0.]), requires_grad=False)
         self.vals = []
 
     # Return predicted outputs and regularisation loss
     def forward(self, xs):
         self.vals = []
 
-        # Need to make sure xs doesn't contain 0
-        xs[xs == 0] = 1e-2
-
-        ts = torch.tensor([0., ])
-        ts = torch.cat([ts, xs])
-
-        output = odeint(self.diffeq, self.init_param, ts,
+        output = odeint(self.diffeq, torch.tensor([0.]), xs,
                         #method="midpoint", options={"step_size": 0.05})
-                        method="dopri8", rtol=0.2, atol=0.2, options={"max_num_steps":25, "dtype":torch.float32})
-        output = output.squeeze()[1:]
+                        method="dopri8", rtol=0.1, atol=0.1, options={"max_num_steps":25, "dtype":torch.float32})
+        output = output.squeeze()
 
-        reg_loss = neg_loss(torch.cat(self.vals)).mean()
-        return output, reg_loss
+        reg_loss = None# neg_loss(torch.cat(self.vals)).mean()
+        return output, self.init_param, reg_loss
 
     def diffeq(self, x, y):
         diff = self.mlp_model.forward(x.unsqueeze(0))
-        grad = diff + 1
-        self.vals.append(grad)
-        return grad
+        grad = diff #+ 1
+        #self.vals.append(grad)
+        return torch.nn.Softplus()(grad) #- 0.1
 
 
 def train(model, xs, ys):

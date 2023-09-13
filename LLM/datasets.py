@@ -1,5 +1,6 @@
 import csv
 import numpy as np
+from sklearn.linear_model import LinearRegression
 
 
 class Adult:
@@ -26,7 +27,7 @@ class Adult:
     col_to_head = {i: h for i, h in enumerate(col_headers)}
     col_to_dtype = {i: d for i, d in enumerate(col_dtypes)}
     correl_mask = np.array([1 if coef is not None else 0 for coef in correl_coef.values()])
-    correl_coef = {c:coef if coef is not None else 0 for c, coef in correl_coef.items()}
+    correl_coef = {c: coef if coef is not None else 0 for c, coef in correl_coef.items()}
 
     # Give each dataset its own csv reader
     def read_csv(self):
@@ -59,21 +60,23 @@ class Bank:
                   float, float, str, str]
 
     # ChatGPT-4 generated orderings:
-    ordered_labels = {1: ['Self-emp-inc', 'Federal-gov', 'Self-emp-not-inc', 'Private', 'Local-gov', 'State-gov', 'Without-pay', 'Never-worked', '?'],
-                      3: ["Doctorate", "Prof-school", "Masters", "Bachelors", "Assoc-acdm", "Assoc-voc", "Some-college",
-                          "HS-grad", "12th", "11th", "10th", "9th", "7th-8th", "5th-6th", "1st-4th", "Preschool"],
-                      5: ['Married-civ-spouse', 'Married-AF-spouse', 'Divorced', 'Never-married', 'Separated', 'Widowed', 'Married-spouse-absent'],
-                      6: ['Exec-managerial', 'Prof-specialty', 'Protective-serv', 'Sales', 'Tech-support', 'Transport-moving', 'Craft-repair', 'Adm-clerical', '?', 'Machine-op-inspct',
-                          'Farming-fishing', 'Handlers-cleaners', 'Other-service', 'Priv-house-serv', 'Armed-Forces'],
-                      7: ['Husband', 'Wife', 'Not-in-family', 'Unmarried', 'Own-child', 'Other-relative'],
+    ordered_labels = {1: ['retired', 'student', 'management', 'technician', 'admin.', 'unknown', 'self-employed', 'services', 'entrepreneur', 'blue-collar', 'housemaid', 'unemployed'],
+                      2: ['single', 'divorced', 'married'],
+                      3: ['tertiary', 'secondary', 'unknown', 'primary'],
+                      4: ['yes', 'no'],
+                      6: ['yes', 'no'],
+                      7: ['yes', 'no'],
+                      8: ['cellular', 'unknown', 'telephone'],
+                      10: ['mar', 'sep', 'oct', 'dec', 'jun', 'jul', 'aug', 'nov', 'may', 'feb', 'apr', 'jan'],
+                      15: ['success',  'other', 'unknown', 'failure'],
                       }
-    correl_coef = {0: 1, 1: -1, 2: 0, 3: -1, 4: -1, 5: -1, 6: -1, 7: -1, 8: None, 9: None, 10: 1, 11: 1, 12: 1, 13: 0}
+    correl_coef = {0: 0, 1: -1, 2: -1, 3: -1, 4: 1, 5: 1, 6: 1, 7: 1, 8: -1, 9: 0, 10: -1, 11: 1, 12: 1, 13: 0, 14: 1, 15: -1}
 
     # Process data
     col_to_head = {i: h for i, h in enumerate(col_headers)}
     col_to_dtype = {i: d for i, d in enumerate(col_dtypes)}
     correl_mask = np.array([1 if coef is not None else 0 for coef in correl_coef.values()])
-    correl_coef = {c:coef if coef is not None else 0 for c, coef in correl_coef.items()}
+    correl_coef = {c: coef if coef is not None else 0 for c, coef in correl_coef.items()}
 
     def read_csv(self):
         """Read data from a CSV file into a 2D array."""
@@ -106,7 +109,6 @@ def map_strings_to_int(xs):
 class Dataset:
     def __init__(self, ds_prop):
         self.ds_prop = ds_prop
-        filename = ds_prop.filename
         data_2d_array = ds_prop.read_csv()[:-1]
         data = np.array(data_2d_array)
 
@@ -165,13 +167,30 @@ class Dataset:
 
 
 def analyse_dataset(ds):
-    # data = ds.read_csv()
-    # data = np.array(data)
-    # for i in range(16):
-    #     keys = sorted(set(data[:, i]))
-    #     print(f'# {ds.col_headers[i]}: {keys}')
-    #     print(len(keys))
-    return
+    data = ds.ordered_data
+
+    col = 3
+
+    print()
+    print(ds.ds_prop.col_headers[col])
+    print()
+    xs = np.array(data[:, col], dtype=float).reshape(-1, 1)
+
+    ys = map_strings_to_int(data[:, -1])
+    ys = np.array(ys, dtype=float)
+
+    model = LinearRegression()
+    model.fit(xs, ys)
+
+    print(f"Slope (Coefficient): {model.coef_[0]}")
+    print(f"Intercept: {model.intercept_}")
+    print()
+    print()
+
+    for x in ds.ds_prop.ordered_labels[col]:
+        idx = (ds.data[:, col] == x)
+        print(f"{x}: {np.mean(ds.num_data[idx, -1])}")
+
 
 if __name__ == "__main__":
-    analyse_dataset(Bank())
+    analyse_dataset(Dataset(Bank()))
