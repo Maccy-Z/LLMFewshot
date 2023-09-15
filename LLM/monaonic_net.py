@@ -7,12 +7,14 @@ from matplotlib import pyplot as plt
 import random
 import numpy as np
 
+
 # Define the MLP model
 class MLP(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
         super(MLP, self).__init__()
         self.fc1 = nn.Linear(input_size, hidden_size)
         self.fc2 = nn.Linear(hidden_size, output_size)
+
         self.fc2.bias.data.fill_(0.0)
         self.fc2.weight.data.fill_(0.0)
         self.act = torch.nn.ELU()
@@ -33,31 +35,32 @@ class MonatoneNet(nn.Module):
         super().__init__()
         self.mlp_model = MLP(input_size, hidden_size, output_size)
         self.init_param = torch.nn.Parameter(torch.tensor([0.]), requires_grad=False)
-        self.vals = []
 
     # Return predicted outputs and regularisation loss
     def forward(self, xs):
-        self.vals = []
 
-        output = odeint(self.diffeq, torch.tensor([0.]), xs,
-                        #method="midpoint", options={"step_size": 0.05})
-                        method="dopri8", rtol=0.1, atol=0.1, options={"max_num_steps":25, "dtype":torch.float32})
+        if self.training:
+            output = odeint(self.diffeq, torch.tensor([0.], requires_grad=False), xs,
+                            method='midpoint', options={"step_size": 0.1})
+            # method="dopri8", rtol=0.05, atol=0.05, options={"max_num_steps": 25, "dtype": torch.float32})
+        else:
+            output = odeint(self.diffeq, torch.tensor([0.]), xs,
+                            method="rk4", options={"step_size": 0.05})
         output = output.squeeze()
 
-        reg_loss = None# neg_loss(torch.cat(self.vals)).mean()
+        reg_loss = None  # neg_loss(torch.cat(self.vals)).mean()
         return output, self.init_param, reg_loss
 
     def diffeq(self, x, y):
         diff = self.mlp_model.forward(x.unsqueeze(0))
-        grad = diff #+ 1
-        #self.vals.append(grad)
-        return torch.nn.Softplus()(grad) #- 0.1
+        grad = diff + 1
+        return torch.nn.Softplus()(grad)  # - 0.1
 
 
 def train(model, xs, ys):
     # Initialize the model, loss, and optimizer
     criterion = nn.L1Loss()
-    optimizer = optim.Adam(model.parameters(), lr=3e-3)
+    optimizer = optim.SGD(model.parameters(), lr=0.02, momentum=0.9)
 
     # Train the model
     epochs = 500
@@ -65,7 +68,7 @@ def train(model, xs, ys):
     losses, reg_losses = [], []
     for epoch in range(epochs):
         # Forward pass
-        outputs, reg_loss = model(xs)
+        outputs, reg_loss, _ = model(xs)
         loss = criterion(outputs, ys)
         full_loss = loss + 0.25 * reg_loss
 
@@ -88,22 +91,24 @@ def train(model, xs, ys):
 
 
 def main():
+    import time
+
     monat_model = MonatoneNet(1, 32, 1)
     xs = torch.linspace(0., 1, 10)
     ys = 3 * (xs - 0.8 * xs ** 2)
 
     train(monat_model, xs, ys)
 
-    xs_test = torch.linspace(0.01, 1, 50).unsqueeze(-1)
+    xs_test = torch.linspace(0., 1, 5000).unsqueeze(-1)
 
-    ys_pred = []
-    for x in xs_test:
-        with torch.no_grad():
-            y_pred, _ = monat_model(x)
-        ys_pred.append(y_pred)
+    with torch.no_grad():
+        st = time.time()
+        y_pred, _, _ = monat_model(xs_test.squeeze())
+        print(monat_model.nfe)
+        print(f'{time.time() - st:.3g}')
 
     plt.scatter(xs, ys)
-    plt.plot(xs_test, ys_pred)
+    plt.plot(xs_test, y_pred)
     plt.show()
 
 
