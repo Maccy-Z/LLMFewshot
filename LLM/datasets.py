@@ -169,7 +169,7 @@ class Dataset:
 def analyse_dataset(ds):
     data = ds.ordered_data
 
-    col = 1
+    col = 5
 
     print()
     print(ds.ds_prop.col_headers[col])

@@ -145,7 +145,6 @@ class DataHolder:
         xs_mapped = xs_mapped - zero_val
 
         xs_mapped = xs_mapped[self.unique_idx[col]]
-
         return xs_mapped
 
 
@@ -185,22 +184,6 @@ class MonatoneLogReg(nn.Module, Model):
         self.linear.bias.data.fill_(0.0)
         self.optimizer = torch.optim.SGD(self.parameters(), lr=self.lr, momentum=0.9)
 
-        # # For each column, we need to find the unique values and use these for the monatone map
-        # for col in range(self.n_cols):
-        #     unique, idx = torch.unique(self.xs_meta[:, col], sorted=True, return_inverse=True)
-        #
-        #     # Need to include 0 in the unique elements as starting point of indefinite integral
-        #     # Handle case where 0 is already in unique elements and not in
-        #     if 0. in unique:
-        #         self.need_zero.append(False)
-        #     else:
-        #         unique = torch.cat([torch.tensor([0.]), unique]).sort()[0]
-        #         self.need_zero.append(True)
-        #
-        #     zero_idx = torch.where(unique == 0)[0]
-        #     self.zero_idx.append(zero_idx.item())
-        #
-        #     self.unique_elements.append(unique), self.unique_idx.append(idx)
         num_neg = (ys_meta == 0).sum().item()
         num_pos = (ys_meta == 1).sum().item()
         tot = num_pos + num_neg
@@ -274,7 +257,7 @@ class MonatoneLogReg(nn.Module, Model):
             model = self.monatone_map[col]
             with torch.no_grad():
                 preds, C, _ = model.forward(xs)
-                # preds = preds - preds[50] + C
+                # preds = self.xs_holder.reconstruct(col, preds)
 
                 beta = self.linear.weight[0, col]
                 preds = beta * preds

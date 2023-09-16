@@ -54,7 +54,7 @@ class MonatoneNet(nn.Module):
     def diffeq(self, x, y):
         diff = self.mlp_model.forward(x.unsqueeze(0))
         grad = diff + 1
-        return torch.nn.Softplus()(grad) - 0.1
+        return grad #torch.nn.Softplus()(grad) - 0.1
 
 
 def train(model, xs, ys):
