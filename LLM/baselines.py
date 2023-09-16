@@ -60,7 +60,7 @@ class BasicModel(Model):
             case "KNN":
                 self.model = KNN(n_neighbors=5, p=1, weights="distance")
             case "CatBoost":
-                self.model = CatBoostClassifier(iterations=500, learning_rate=0.03, allow_const_label=True, verbose=False)
+                self.model = CatBoostClassifier(iterations=500, learning_rate=0.03, allow_const_label=True, verbose=False, auto_class_weights='Balanced')
             case "R_Forest":
                 self.model = RandomForestClassifier(n_estimators=150, n_jobs=5)
             case _:

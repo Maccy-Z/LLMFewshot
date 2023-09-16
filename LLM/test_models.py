@@ -17,13 +17,14 @@ def monat_acc(data):
 
     print(f'Accuracy: {acc:.3g}, {auc = :.3g}')
 
+    clf.plot_net()
     return acc, auc
 
 
-def base_acc(data):
+def base_acc(data, model):
     X_train, X_test, y_train, y_test = data
 
-    clf = BasicModel("CatBoost")
+    clf = BasicModel(model)
     clf.fit(X_train, y_train)
     acc = clf.get_acc(X_test, y_test).mean()
 
@@ -61,8 +62,8 @@ def eval_ordering(ds, col_no, train_size, seed):
     xs_raw = ds.get_base(col_no)
     xs_ord = ds.get_ordered(col_no)
 
-    raw = X_raw_train, X_raw_test, y_raw_train, y_raw_test = train_test_split(xs_raw, ys, train_size=train_size, random_state=seed, stratify=ys)
-    ord = X_ord_train, X_ord_test, y_ord_train, y_ord_test = train_test_split(xs_ord, ys, train_size=train_size, random_state=seed, stratify=ys)
+    raw = train_test_split(xs_raw, ys, train_size=train_size, random_state=seed, stratify=ys)
+    ord = train_test_split(xs_ord, ys, train_size=train_size, random_state=seed, stratify=ys)
 
     print("Baseline")
     a, auc = LR_acc(raw)
@@ -79,8 +80,12 @@ def eval_ordering(ds, col_no, train_size, seed):
     a, auc = LR_acc(ord, lam=0.01, bias=bias, mask=mask)
     accs.append(a), aucs.append(auc)
 
-    print("SVC base")
-    a, auc = base_acc(raw)
+    print("CatBoost base")
+    a, auc = base_acc(raw, "CatBoost")
+    accs.append(a), aucs.append(auc)
+
+    print("CatBoost ordered")
+    a, auc = base_acc(ord, "CatBoost")
     accs.append(a), aucs.append(auc)
 
     print("Monat ordered")
@@ -90,7 +95,7 @@ def eval_ordering(ds, col_no, train_size, seed):
     return accs, aucs
 
 
-if __name__ == "__main__":
+def main():
 
     ds = Adult()
     dl = Dataset(ds)
@@ -98,15 +103,19 @@ if __name__ == "__main__":
     print("Using columns:", ds.col_headers[cols])
 
     accs, aucs = [], []
-    for s in range(20):
+    for s in range(10):
         print()
-        acc, auc = eval_ordering(dl, cols, train_size=100, seed=s)
+        acc, auc = eval_ordering(dl, cols, train_size=2000, seed=s)
         accs.append(acc), aucs.append(auc)
 
     accs, aucs = np.array(accs), np.array(aucs)
     mean, aucs = np.mean(accs, axis=0), np.mean(aucs, axis=0)
     print()
     [print(f'acc = {m:.3g}, auc = {a:.3g}') for m, a in zip(mean, aucs)]
+
+
+if __name__ == "__main__":
+    main()
 
 # 0.7670200563987198
 # 0.800307975032477

@@ -13,7 +13,7 @@ class Adult:
                   str, str]
 
     # ChatGPT-4 generated orderings:
-    ordered_labels = {1: ['Self-emp-inc', 'Federal-gov', 'Self-emp-not-inc', 'Private', 'Local-gov', 'State-gov', 'Without-pay', 'Never-worked', '?'],
+    ordered_labels = {1: ['Self-emp-inc', 'Federal-gov', 'Self-emp-not-inc', 'Private', 'Local-gov', 'State-gov', '?', 'Without-pay', 'Never-worked'],
                       3: ["Doctorate", "Prof-school", "Masters", "Bachelors", "Assoc-acdm", "Assoc-voc", "Some-college",
                           "HS-grad", "12th", "11th", "10th", "9th", "7th-8th", "5th-6th", "1st-4th", "Preschool"],
                       5: ['Married-civ-spouse', 'Married-AF-spouse', 'Divorced', 'Never-married', 'Separated', 'Widowed', 'Married-spouse-absent'],
@@ -169,7 +169,7 @@ class Dataset:
 def analyse_dataset(ds):
     data = ds.ordered_data
 
-    col = 3
+    col = 1
 
     print()
     print(ds.ds_prop.col_headers[col])
@@ -193,4 +193,4 @@ def analyse_dataset(ds):
 
 
 if __name__ == "__main__":
-    analyse_dataset(Dataset(Bank()))
+    analyse_dataset(Dataset(Adult()))
