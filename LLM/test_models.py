@@ -115,7 +115,7 @@ def main():
     accs, aucs = [], []
     for s in range(10):
         print()
-        acc, auc = eval_ordering(dl, cols, train_size=2048, seed=s)
+        acc, auc = eval_ordering(dl, cols, train_size=512, seed=s)
         accs.append(acc), aucs.append(auc)
 
     accs, aucs = np.array(accs), np.array(aucs)
