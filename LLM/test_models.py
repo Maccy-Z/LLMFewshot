@@ -37,9 +37,8 @@ def base_acc(data, model):
     return acc, auc
 
 
-def LR_acc(data, lam=0., bias: torch.Tensor = None, mask: torch.Tensor = None):
+def LR_acc(data, lam=0.01, bias: torch.Tensor = None, mask: torch.Tensor = None):
     X_train, X_test, y_train, y_test = data
-
     if mask is None:
         mask = torch.ones(X_train.shape[1])
     if bias is None:
@@ -61,12 +60,18 @@ def eval_ordering(ds, col_no, train_size, seed):
 
     xs_raw = ds.get_base(col_no)
     xs_ord = ds.get_ordered(col_no)
+    xs_one = ds.get_onehot(col_no)
 
     raw = train_test_split(xs_raw, ys, train_size=train_size, random_state=seed, stratify=ys)
     ord = train_test_split(xs_ord, ys, train_size=train_size, random_state=seed, stratify=ys)
+    one = train_test_split(xs_one, ys, train_size=train_size, random_state=seed, stratify=ys)
 
     print("Baseline")
     a, auc = LR_acc(raw)
+    accs.append(a), aucs.append(auc)
+
+    print("One hot")
+    a, auc = LR_acc(one)
     accs.append(a), aucs.append(auc)
 
     print("Ordered")
@@ -77,15 +82,20 @@ def eval_ordering(ds, col_no, train_size, seed):
     bias, mask = ds.get_bias(col_no)
     # mask = np.ones_like(mask)
     bias, mask = torch.tensor(bias, dtype=torch.float32), torch.tensor(mask, dtype=torch.float32)
-    a, auc = LR_acc(ord, lam=0.01, bias=bias, mask=mask)
+    mask = torch.ones_like(mask)
+    a, auc = LR_acc(ord, lam=0.01, bias=bias)
     accs.append(a), aucs.append(auc)
-
-    print("CatBoost base")
+    #
+    # print("CatBoost base")
     a, auc = base_acc(raw, "CatBoost")
     accs.append(a), aucs.append(auc)
 
     print("CatBoost ordered")
     a, auc = base_acc(ord, "CatBoost")
+    accs.append(a), aucs.append(auc)
+
+    print("CatBoost one-hot")
+    a, auc = base_acc(one, "CatBoost")
     accs.append(a), aucs.append(auc)
 
     print("Monat ordered")
@@ -105,7 +115,7 @@ def main():
     accs, aucs = [], []
     for s in range(10):
         print()
-        acc, auc = eval_ordering(dl, cols, train_size=1000, seed=s)
+        acc, auc = eval_ordering(dl, cols, train_size=2048, seed=s)
         accs.append(acc), aucs.append(auc)
 
     accs, aucs = np.array(accs), np.array(aucs)

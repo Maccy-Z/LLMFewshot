@@ -1,6 +1,7 @@
 import csv
 import numpy as np
 from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import OneHotEncoder
 
 
 class Adult:
@@ -164,6 +165,22 @@ class Dataset:
 
     def get_bias(self, col_no):
         return [self.ds_prop.correl_coef[c] for c in col_no], self.ds_prop.correl_mask[col_no]
+
+    # Return one-hot encoding of categorical columns
+    def get_onehot(self, col_nos):
+        xs_one_hot = []
+        for col_no in col_nos:
+            if col_no in self.ds_prop.ordered_labels.keys():
+                xs = self.data[:, col_no]
+                xs = xs[:, np.newaxis]
+                encoder = OneHotEncoder(sparse_output=False)
+                xs_one = encoder.fit_transform(xs)
+                xs_one_hot.append(xs_one)
+            else:
+                xs_one_hot.append(self.get_base([col_no]))
+
+        xs_one_hot = np.concatenate(xs_one_hot, axis=1)
+        return xs_one_hot
 
 
 def analyse_dataset(ds):

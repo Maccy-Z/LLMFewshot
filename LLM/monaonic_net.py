@@ -34,7 +34,6 @@ class MonatoneNet(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
         super().__init__()
         self.mlp_model = MLP(input_size, hidden_size, output_size)
-        self.init_param = torch.nn.Parameter(torch.tensor([0.]), requires_grad=False)
 
     # Return predicted outputs and regularisation loss
     def forward(self, xs):
@@ -48,13 +47,12 @@ class MonatoneNet(nn.Module):
                             method="rk4", options={"step_size": 0.05})
         output = output.squeeze()
 
-        reg_loss = None  # neg_loss(torch.cat(self.vals)).mean()
-        return output, self.init_param, reg_loss
+        return output
 
     def diffeq(self, x, y):
         diff = self.mlp_model.forward(x.unsqueeze(0))
         grad = diff + 1
-        return grad #torch.nn.Softplus()(grad) - 0.1
+        return torch.nn.Softplus()(grad) #- 0.1
 
 
 def train(model, xs, ys):
@@ -104,7 +102,6 @@ def main():
     with torch.no_grad():
         st = time.time()
         y_pred, _, _ = monat_model(xs_test.squeeze())
-        print(monat_model.nfe)
         print(f'{time.time() - st:.3g}')
 
     plt.scatter(xs, ys)

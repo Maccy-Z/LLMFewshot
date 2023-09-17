@@ -14,6 +14,7 @@ from sklearn.ensemble import RandomForestClassifier
 # from pytorch_tabnet.tab_model import TabNetClassifier
 from catboost import CatBoostClassifier, CatboostError
 from tab_transformer_pytorch import FTTransformer
+from xgboost import XGBClassifier
 
 BASEDIR = '.'
 max_batches = 40
@@ -63,6 +64,8 @@ class BasicModel(Model):
                 self.model = CatBoostClassifier(iterations=500, learning_rate=0.03, allow_const_label=True, verbose=False, auto_class_weights='Balanced')
             case "R_Forest":
                 self.model = RandomForestClassifier(n_estimators=150, n_jobs=5)
+            case "XGBoost":
+                self.model = XGBClassifier(n_estimators=150, n_jobs=5)
             case _:
                 raise Exception("Invalid model specified")
 

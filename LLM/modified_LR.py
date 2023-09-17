@@ -23,7 +23,7 @@ class LogRegBias(nn.Module, Model):
     linear: nn.Module
     optimizer: torch.optim.Optimizer
 
-    def __init__(self, fit_intercept, lr=0.01, steps=100, bias: float | torch.Tensor = 0., lam=0., mask=0.):
+    def __init__(self, fit_intercept, lr=0.01, steps=100, bias: float | torch.Tensor = 0., lam=1., mask=1.):
         super().__init__()
         self.fit_intercept = fit_intercept
         self.steps = steps
@@ -141,11 +141,10 @@ class DataHolder:
         if self.need_zero[col]:
             xs_mapped = torch.cat([xs_mapped[:zero_idx], xs_mapped[zero_idx + 1:]])
 
-        # Subtract offset and add integration constant
         xs_mapped = xs_mapped - zero_val
 
         xs_mapped = xs_mapped[self.unique_idx[col]]
-        return xs_mapped
+        return xs_mapped, zero_val
 
 
 class MonatoneLogReg(nn.Module, Model):
@@ -193,18 +192,16 @@ class MonatoneLogReg(nn.Module, Model):
         self.loss_fn = nn.BCELoss(weight=weights)
 
         for i in range(self.steps):
-            loss = self.train_step()
-            if i % 10 == 0:
-                # print(f'{i}, Loss: {loss:.3g}, Time: {time.time() - st:.3g}')
-                st = time.time()
+            self.train_step()
 
     # Single optimisation step
     def train_step(self):
         self.optimizer.zero_grad()
 
-        preds = self.forward_step(self.xs_holder)
+        preds, beta_effs = self.forward_step(self.xs_holder)
 
         loss = self.loss_fn(preds, self.ys_meta)
+        loss += torch.mean(torch.stack(beta_effs)) * 0.02
         loss.backward()
         self.optimizer.step()
 
@@ -212,21 +209,31 @@ class MonatoneLogReg(nn.Module, Model):
 
     # Return predictions from a batch of data
     def forward_step(self, xs_holder) -> np.array:
-        xs_mapped = torch.empty(xs_holder.shape)
+        beta_effs = []
 
+        xs_monatone = torch.empty(xs_holder.shape)
         # Pass the unique elements through the monatone map and reconstruct
         for col in range(self.n_cols):
             xs_unique = xs_holder.get_unique(col)
 
-            mapped_col, C, reg_loss = self.monatone_map[col].forward(xs_unique)
+            mapped_col = self.monatone_map[col].forward(xs_unique)
 
-            mapped_col = xs_holder.reconstruct(col, mapped_col)
-            xs_mapped[:, col] = mapped_col
+            xs_reconstruct, zero_val = xs_holder.reconstruct(col, mapped_col)
+            xs_monatone[:, col] = xs_reconstruct
+
+            # Get effective beta
+            ys = mapped_col - zero_val
+            ys = ys * self.linear.weight[0, col]
+            beta_eff = torch.mean(ys ** 2/(xs_unique ** 2 + 0.01))
+
+            beta_effs.append(beta_eff)
+
+        #print(beta_effs)
 
         # Multiply by weights
-        preds = self.forward(xs_mapped)
+        preds = self.forward(xs_monatone)
 
-        return preds
+        return preds, beta_effs
 
     # Return test accuracy and auc
     def get_acc(self, xs_target, ys_target):
@@ -235,7 +242,7 @@ class MonatoneLogReg(nn.Module, Model):
 
         xs_holder = DataHolder(xs_target)
         with torch.no_grad():
-            preds = self.forward_step(xs_holder)
+            preds, _ = self.forward_step(xs_holder)
 
         y_pred, y_probs = preds > 0.5, preds
 
@@ -256,14 +263,14 @@ class MonatoneLogReg(nn.Module, Model):
             xs = self.xs_holder.get_unique(col)
             model = self.monatone_map[col]
             with torch.no_grad():
-                preds, C, _ = model.forward(xs)
+                preds = model.forward(xs)
                 # preds = self.xs_holder.reconstruct(col, preds)
 
                 beta = self.linear.weight[0, col]
                 preds = beta * preds
 
             plt.plot(xs, preds)
-            plt.ylim([-7, 7])
+            plt.ylim([-3, 3])
             plt.title(col)
             plt.show()
 
@@ -274,8 +281,8 @@ def plot_net(model: nn.Module, beta, model_beta, i):
     model.train(False)
 
     with torch.no_grad():
-        preds, C, _ = model.forward(xs)
-        preds = (preds - preds[50] + C) * model_beta
+        preds = model.forward(xs)
+        preds = (preds - preds[50]) * model_beta
 
     true_logit = beta * torch.relu(xs)
     plt.plot(xs, preds)
@@ -305,7 +312,7 @@ def test_logistic_regression():
     X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.8, random_state=42)
 
     # Create and train the model
-    model = MonatoneLogReg(lr=0.02, steps=100)
+    model = MonatoneLogReg(lr=0.02, steps=50)
     model.fit(X_train, y_train)
 
     # Make predictions
@@ -323,7 +330,7 @@ def test_logistic_regression():
         monatone_model = model.monatone_map[i]
         plot_net(monatone_model, beta[i], model.linear.weight[0, i], i)
 
-    model.plot_net()
+    #model.plot_net()
 
 
 if __name__ == "__main__":
