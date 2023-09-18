@@ -11,7 +11,7 @@ from datasets import Dataset, Adult, Bank
 def monat_acc(data):
     X_train, X_test, y_train, y_test = data
 
-    clf = MonatoneLogReg(steps=200)
+    clf = MonatoneLogReg(steps=200, lam=0.05, lr=0.02)
     clf.fit(X_train, y_train)
     acc, auc = clf.get_acc(X_test, y_test)
 
@@ -66,37 +66,37 @@ def eval_ordering(ds, col_no, train_size, seed):
     ord = train_test_split(xs_ord, ys, train_size=train_size, random_state=seed, stratify=ys)
     one = train_test_split(xs_one, ys, train_size=train_size, random_state=seed, stratify=ys)
 
-    print("Baseline")
-    a, auc = LR_acc(raw)
-    accs.append(a), aucs.append(auc)
-
-    print("One hot")
-    a, auc = LR_acc(one)
-    accs.append(a), aucs.append(auc)
-
-    print("Ordered")
-    a, auc = LR_acc(ord)
-    accs.append(a), aucs.append(auc)
-
-    print("Biased")
-    bias, mask = ds.get_bias(col_no)
-    # mask = np.ones_like(mask)
-    bias, mask = torch.tensor(bias, dtype=torch.float32), torch.tensor(mask, dtype=torch.float32)
-    mask = torch.ones_like(mask)
-    a, auc = LR_acc(ord, lam=0.01, bias=bias)
-    accs.append(a), aucs.append(auc)
+    # print("Baseline")
+    # a, auc = LR_acc(raw)
+    # accs.append(a), aucs.append(auc)
+    #
+    # print("One hot")
+    # a, auc = LR_acc(one)
+    # accs.append(a), aucs.append(auc)
+    #
+    # print("Ordered")
+    # a, auc = LR_acc(ord)
+    # accs.append(a), aucs.append(auc)
+    #
+    # print("Biased")
+    # bias, mask = ds.get_bias(col_no)
+    # # mask = np.ones_like(mask)
+    # bias, mask = torch.tensor(bias, dtype=torch.float32), torch.tensor(mask, dtype=torch.float32)
+    # mask = torch.ones_like(mask)
+    # a, auc = LR_acc(ord, lam=0.01, bias=bias)
+    # accs.append(a), aucs.append(auc)
     #
     # print("CatBoost base")
-    a, auc = base_acc(raw, "CatBoost")
-    accs.append(a), aucs.append(auc)
-
-    print("CatBoost ordered")
-    a, auc = base_acc(ord, "CatBoost")
-    accs.append(a), aucs.append(auc)
-
-    print("CatBoost one-hot")
-    a, auc = base_acc(one, "CatBoost")
-    accs.append(a), aucs.append(auc)
+    # a, auc = base_acc(raw, "CatBoost")
+    # accs.append(a), aucs.append(auc)
+    #
+    # print("CatBoost ordered")
+    # a, auc = base_acc(ord, "CatBoost")
+    # accs.append(a), aucs.append(auc)
+    #
+    # print("CatBoost one-hot")
+    # a, auc = base_acc(one, "CatBoost")
+    # accs.append(a), aucs.append(auc)
 
     print("Monat ordered")
     a, auc = monat_acc(ord)
@@ -107,9 +107,9 @@ def eval_ordering(ds, col_no, train_size, seed):
 
 def main():
 
-    ds = Adult()
+    ds = Bank()
     dl = Dataset(ds)
-    cols = range(14)
+    cols = range(len(dl))
     print("Using columns:", ds.col_headers[cols])
 
     accs, aucs = [], []

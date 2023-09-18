@@ -156,10 +156,11 @@ class MonatoneLogReg(nn.Module, Model):
     xs_holder: DataHolder
     n_cols: int
 
-    def __init__(self, lr=0.02, steps=1):
+    def __init__(self, lr, steps, lam):
         super().__init__()
         self.steps = steps
         self.lr = lr
+        self.lam = lam
 
     def forward(self, x):
         return torch.sigmoid(self.linear(x))
@@ -201,7 +202,7 @@ class MonatoneLogReg(nn.Module, Model):
         preds, beta_effs = self.forward_step(self.xs_holder)
 
         loss = self.loss_fn(preds, self.ys_meta)
-        loss += torch.mean(torch.stack(beta_effs)) * 0.02
+        loss += torch.mean(torch.stack(beta_effs)) * self.lam
         loss.backward()
         self.optimizer.step()
 
@@ -270,7 +271,7 @@ class MonatoneLogReg(nn.Module, Model):
                 preds = beta * preds
 
             plt.plot(xs, preds)
-            plt.ylim([-3, 3])
+            plt.ylim([-7, 7])
             plt.title(col)
             plt.show()
 

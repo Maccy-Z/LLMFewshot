@@ -54,8 +54,8 @@ class Bank:
     # poutcome: ['failure', 'other', 'success', 'unknown']
 
     filename = './bank/train.csv'
-    col_headers = np.array(['age', 'job', 'marital', 'education', 'default', 'balance', 'housing', 'loan', 'contact', 'day', 'month', 'duration', 'campaign', 'pdays', 'previous', 'poutcome', 'y']
-                           )
+    col_headers = np.array(['age', 'job', 'marital', 'education', 'default', 'balance', 'housing', 'loan', 'contact', 'day',
+                            'month', 'duration', 'campaign', 'pdays', 'previous', 'poutcome', 'y'])
     col_dtypes = [float, str, str, str, str, float,
                   str, str, str, float, str, float, float,
                   float, float, str, str]
@@ -67,7 +67,7 @@ class Bank:
                       4: ['yes', 'no'],
                       6: ['yes', 'no'],
                       7: ['yes', 'no'],
-                      8: ['cellular', 'unknown', 'telephone'],
+                      8: ['cellular', 'telephone', 'unknown'],
                       10: ['mar', 'sep', 'oct', 'dec', 'jun', 'jul', 'aug', 'nov', 'may', 'feb', 'apr', 'jan'],
                       15: ['success',  'other', 'unknown', 'failure'],
                       }
@@ -182,6 +182,9 @@ class Dataset:
         xs_one_hot = np.concatenate(xs_one_hot, axis=1)
         return xs_one_hot
 
+    def __len__(self):
+        return self.data.shape[1] - 1
+
 
 def analyse_dataset(ds):
     data = ds.ordered_data
@@ -210,4 +213,4 @@ def analyse_dataset(ds):
 
 
 if __name__ == "__main__":
-    analyse_dataset(Dataset(Adult()))
+    analyse_dataset(Dataset(Bank()))
