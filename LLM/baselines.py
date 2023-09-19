@@ -1,11 +1,11 @@
 # Evaluate models on batches. Do the actual accuracy evaluation.
-
 import os, toml, random
 import numpy as np
 from scipy import stats
 from abc import ABC, abstractmethod
 import pandas as pd
 from collections import defaultdict
+from sklearn.model_selection import train_test_split, GridSearchCV
 
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
@@ -65,7 +65,7 @@ class BasicModel(Model):
             case "R_Forest":
                 self.model = RandomForestClassifier(n_estimators=150, n_jobs=5)
             case "XGBoost":
-                self.model = XGBClassifier(n_estimators=150, n_jobs=5)
+                self.model = XGBClassifier(n_estimators=150, n_jobs=8)
             case _:
                 raise Exception("Invalid model specified")
 
@@ -75,6 +75,85 @@ class BasicModel(Model):
     def fit(self, xs_meta, ys_meta):
         ys_meta = ys_meta.flatten()
         xs_meta = xs_meta
+        if ys_meta.min() == ys_meta.max():
+            print("Catboost error")
+
+            self.identical_batch = True
+            self.pred_val = ys_meta[0]
+        else:
+            self.identical_batch = False
+
+            try:
+                self.model.fit(xs_meta, ys_meta)
+            except CatboostError:
+                # Catboost fails if every input element is the same
+                self.identical_batch = True
+                mode = stats.mode(ys_meta, keepdims=False)[0]
+                self.pred_val = mode
+
+    def get_acc(self, xs_target, ys_target):
+        xs_target = xs_target
+        if self.identical_batch:
+            predictions = np.ones_like(ys_target) * self.pred_val
+        else:
+            predictions = self.model.predict(xs_target)
+
+        return np.array(predictions).flatten() == np.array(ys_target)
+
+    def predict_proba(self, xs_target):
+        if self.identical_batch:
+            return np.ones([xs_target.shape[0], 2]) * 0.5
+        else:
+            return self.model.predict_proba(xs_target)
+
+    def __repr__(self):
+        return self.name
+
+
+# Fit model parameters on validation set
+class FittedModel(Model):
+    param_space: dict
+    best_params: dict | None
+
+    def __init__(self, name):
+        match name:
+            case "LR":
+                self.model = LogisticRegression()
+                self.param_grid = {"penalty": ["l1", "l2"],
+                                   "C": [100, 10, 1, 0.1, 0.01]}
+            case "SVC":
+                self.model = SVC()
+            case "KNN":
+                self.model = KNN()
+            case "CatBoost":
+                self.model = CatBoostClassifier()
+            case "R_Forest":
+                self.model = RandomForestClassifier()
+            case "XGBoost":
+                self.model = XGBClassifier(objective='binary:logistic')
+                self.param_grid = {"max_depth": [4, 6, 8, 10, 12],
+                                   "reg_alpha": [1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1.],
+                                   "reg_lambda": [1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2],
+                                   "eta": [0.01, 0.03, 0.1, 0.3]}
+            case _:
+                raise Exception("Invalid model specified")
+
+        self.name = name
+        self.identical_batch = False
+
+    def fit_params(self, xs_val, ys_val):
+        ys_val = ys_val.flatten()
+        if ys_val.min() == ys_val.max():
+            return
+
+        # Find optimal paramters
+        grid_search = GridSearchCV(self.model, self.param_grid, cv=3, scoring='accuracy', verbose=3, n_jobs=7)
+        grid_search.fit(xs_val, ys_val)
+
+        self.model = grid_search.best_estimator_
+
+    def fit(self, xs_meta, ys_meta):
+        ys_meta = ys_meta.flatten()
         if ys_meta.min() == ys_meta.max():
             print("Catboost error")
 
