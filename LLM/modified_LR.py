@@ -23,7 +23,7 @@ class LogRegBias(nn.Module, Model):
     linear: nn.Module
     optimizer: torch.optim.Optimizer
 
-    def __init__(self, fit_intercept, lr=0.01, steps=100, bias: float | torch.Tensor = 0., lam=1., mask=1.):
+    def __init__(self, fit_intercept, lr, steps, lam, bias: float | torch.Tensor, mask):
         super().__init__()
         self.fit_intercept = fit_intercept
         self.steps = steps
@@ -41,14 +41,14 @@ class LogRegBias(nn.Module, Model):
         dims = xs_meta.shape
 
         # Weighting
-        num_neg = (ys_meta == 0).sum().item()
-        num_pos = (ys_meta == 1).sum().item()
-        tot = num_pos + num_neg
-        weight_neg = tot / (2 * num_neg + 1e-4)
-        weight_pos = tot / (2 * num_pos + 1e-4)
-        weights = torch.where(ys_meta == 1, weight_pos, weight_neg)
+        # num_neg = (ys_meta == 0).sum().item()
+        # num_pos = (ys_meta == 1).sum().item()
+        # tot = num_pos + num_neg
+        # weight_neg = tot / (2 * num_neg + 1e-4)
+        # weight_pos = tot / (2 * num_pos + 1e-4)
+        # weights = torch.where(ys_meta == 1, weight_pos, weight_neg)
 
-        self.loss_fn = nn.BCELoss(weight=weights)
+        self.loss_fn = nn.BCELoss()
         self.linear = nn.Linear(dims[1], 1, bias=self.fit_intercept)
         self.linear.weight.data.fill_(0.0)
         if self.fit_intercept:
@@ -57,11 +57,6 @@ class LogRegBias(nn.Module, Model):
 
         for i in range(self.steps):
             self.optimizer.step(self._closure)
-
-        # if self.fit_intercept:
-        #     print(f'weights: {self.linear.weight.detach().numpy()[0]}, bias: {self.linear.bias.detach().numpy()[0]}')
-        # else:
-        #     print(f'Learned weights: {self.linear.weight.detach().numpy()[0]}')
 
     def _closure(self):
         self.optimizer.zero_grad()

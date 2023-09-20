@@ -4,7 +4,7 @@ from sklearn.metrics import roc_auc_score
 import torch
 
 from modified_LR import LogRegBias, MonatoneLogReg
-from baselines import BasicModel
+from baselines import BasicModel, OptimisedModel
 from datasets import Dataset, Adult, Bank
 
 
@@ -21,24 +21,9 @@ def monat_acc(data):
     return acc, auc
 
 
-def base_acc(data, model):
-    X_train, X_test, y_train, y_test = data
-
-    clf = BasicModel(model)
-    clf.fit(X_train, y_train)
-    acc = clf.get_acc(X_test, y_test).mean()
-
-    y_prob = clf.predict_proba(X_test)
-    y_prob = y_prob[:, -1]
-    auc = roc_auc_score(y_test, y_prob)
-
-    print(f'Accuracy: {acc:.3g}, {auc = :.3g}')
-
-    return acc, auc
-
-
-def LR_acc(data, lam=0.01, bias: torch.Tensor = None, mask: torch.Tensor = None):
-    X_train, X_test, y_train, y_test = data
+# Evaluate LR with biases
+def LR_acc(data, bias: torch.Tensor = None, mask: torch.Tensor = None):
+    X_train, _, _, _ = data[0]
     if mask is None:
         mask = torch.ones(X_train.shape[1])
     if bias is None:
@@ -46,56 +31,114 @@ def LR_acc(data, lam=0.01, bias: torch.Tensor = None, mask: torch.Tensor = None)
     bias.requires_grad = False
     mask.requires_grad = False
 
-    clf = LogRegBias(fit_intercept=True, lam=lam, bias=bias, mask=mask)
-    clf.fit(X_train, y_train)
-    acc, auc = clf.get_acc(X_test, y_test)
-    print(f'Accuracy: {acc:.3g}, {auc = :.3g}')
-
-    return acc, auc
-
-
-def eval_ordering(ds, col_no, train_size, seed):
-    ys = ds.num_data[:, -1]
     accs, aucs = [], []
+    for X_train, X_test, y_train, y_test in data[1:]:
+        clf = LogRegBias(fit_intercept=True, lr=0.01, steps=75, lam=10, bias=bias, mask=mask)
+        clf.fit(X_train, y_train)
+        acc, auc = clf.get_acc(X_test, y_test)
+        accs.append(acc), aucs.append(auc)
+
+    accs, aucs = np.mean(accs), np.mean(aucs)
+
+    return accs, aucs
+
+
+# Evaluate model with prefit paramters
+def base_acc(data, model):
+    clf = BasicModel(model)
+    # Evaluate optimal model on test set
+    accs, aucs = [], []
+    for X_train, X_test, y_train, y_test in data[1:]:
+        clf.fit(X_train, y_train)
+        acc = clf.get_acc(X_test, y_test).mean()
+
+        y_prob = clf.predict_proba(X_test)
+        y_prob = y_prob[:, -1]
+        auc = roc_auc_score(y_test, y_prob)
+
+        accs.append(acc), aucs.append(auc)
+
+    accs, aucs = np.mean(accs), np.mean(aucs)
+
+    return accs, aucs
+
+
+# Evaluate model and fit hyperparameters
+def optim_acc(data, model):
+    clf = OptimisedModel(model)
+
+    accs, aucs = [], []
+    for i, (X_train, X_test, y_train, y_test) in enumerate(data):
+        # Rerun paramter optimisation every few trials to avoid overfitting to single batch
+        if i % 20 == 0:
+            clf.fit_params(X_train, y_train)
+            continue
+
+        clf.fit(X_train, y_train)
+        acc = clf.get_acc(X_test, y_test).mean()
+        y_prob = clf.predict_proba(X_test)[:, -1]
+        auc = roc_auc_score(y_test, y_prob)
+
+        accs.append(acc), aucs.append(auc)
+
+    accs, aucs = np.array(accs), np.array(aucs)
+    accs, aucs = np.mean(accs), np.mean(aucs)
+
+    return accs, aucs
+
+
+def eval_ordering(model_list, ds, col_no, train_size, n_trials=10):
+    ys = ds.num_data[:, -1]
 
     xs_raw = ds.get_base(col_no)
     xs_ord = ds.get_ordered(col_no)
     xs_one = ds.get_onehot(col_no)
 
-    raw = train_test_split(xs_raw, ys, train_size=train_size, random_state=seed, stratify=ys)
-    ord = train_test_split(xs_ord, ys, train_size=train_size, random_state=seed, stratify=ys)
-    one = train_test_split(xs_one, ys, train_size=train_size, random_state=seed, stratify=ys)
+    raw_data, ord_data, onehot_data = [], [], []
+    for s in range(n_trials):
+        raw = train_test_split(xs_raw, ys, train_size=train_size, random_state=s, stratify=ys)
+        ord = train_test_split(xs_ord, ys, train_size=train_size, random_state=s, stratify=ys)
+        one = train_test_split(xs_one, ys, train_size=train_size, random_state=s, stratify=ys)
 
-    # print("Baseline")
-    # a, auc = LR_acc(raw)
-    # accs.append(a), aucs.append(auc)
-    #
+        raw_data.append(raw), ord_data.append(ord), onehot_data.append(one)
+
+    a, auc = LR_acc(ord_data)
+    print(f'LR ord:   accuracy: {a:.3g}, {auc = :.3g}')
+
+    for model_type, eval_types in model_list:
 
 
-    return accs, aucs
+        results = []
+        if "raw" in eval_types:
+            a, auc = optim_acc(raw_data, model_type)
+            results.append(["raw", a, auc])
+        if "ord" in eval_types:
+            a, auc = optim_acc(ord_data, model_type)
+            results.append(["ord", a, auc])
+        if "onehot" in eval_types:
+            a, auc = optim_acc(onehot_data, model_type)
+            results.append(["onehot", a, auc])
+
+        print(f'{model_type}')
+        for r in results:
+            print(f'{r[0]}: accuracy: {r[1]:.3g}, auc{r[2]:.3g}')
+        print()
 
 
 def main():
-    ds = Bank()
-    dl = Dataset(ds)
+    dl = Dataset(Adult())
     cols = range(len(dl))
-    print("Using columns:", ds.col_headers[cols])
 
-    accs, aucs = [], []
-    for s in range(10):
-        print()
-        acc, auc = eval_ordering(dl, cols, train_size=512, seed=s)
-        accs.append(acc), aucs.append(auc)
-
-    accs, aucs = np.array(accs), np.array(aucs)
-    mean, aucs = np.mean(accs, axis=0), np.mean(aucs, axis=0)
+    print("Using columns:", dl.ds_prop.col_headers[cols])
     print()
-    [print(f'acc = {m:.3g}, auc = {a:.3g}') for m, a in zip(mean, aucs)]
+
+    # List of models to evaluate
+    model_list = [("LR", ["ord", "onehot"]),
+                  ("XGBoost", ["ord", "onehot"]),
+                  ("CatBoost", ["ord", "onehot"])]
+
+    eval_ordering(model_list, dl, cols, train_size=16, n_trials=100)
 
 
 if __name__ == "__main__":
     main()
-
-# 0.7670200563987198
-# 0.800307975032477
-# 0.7963904819238934
