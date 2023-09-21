@@ -1,3 +1,4 @@
+# Evaluate baseline models. Save results to file.
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_auc_score
@@ -140,7 +141,8 @@ def main():
                   ("XGBoost", ["raw", "order", "onehot"]),
                   ]
 
-    eval_ordering(model_list, dl, cols, train_size=512, n_trials=100)
+    for size in [4, 8, 16, 32, 64, 128, 256, 512]:
+        eval_ordering(model_list, dl, cols, train_size=size, n_trials=100)
 
 
 if __name__ == "__main__":

@@ -144,7 +144,7 @@ class OptimisedModel(Model):
             case "R_Forest":
                 self.model = RandomForestClassifier(**self.best_params)
             case "XGBoost":
-                self.model = XGBClassifier(**self.best_params, objective='binary:logistic')
+                self.model = XGBClassifier(**self.best_params, objective='binary:logistic', nthread=1)
                 self.param_grid = {"max_depth": [2, 4, 6, 8, 10, 12],
                                    "reg_alpha": [1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2],
                                    "reg_lambda": [1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2],
@@ -167,7 +167,7 @@ class OptimisedModel(Model):
         # Find optimal paramters
         self.best_params = {}
         self.set_model()
-        grid_search = GridSearchCV(self.model, self.param_grid, cv=4, scoring='accuracy', verbose=0, n_jobs=7)
+        grid_search = GridSearchCV(self.model, self.param_grid, cv=4, scoring='accuracy', verbose=0, n_jobs=8)
         grid_search.fit(xs_val, ys_val)
 
         # Make model with optimal parameters
