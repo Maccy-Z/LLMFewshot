@@ -33,10 +33,11 @@ def LR_acc(data, bias: torch.Tensor = None, mask: torch.Tensor = None):
 
     accs, aucs = [], []
     for X_train, X_test, y_train, y_test in data[1:]:
-        clf = LogRegBias(fit_intercept=True, lr=0.01, steps=75, lam=10, bias=bias, mask=mask)
+        clf = LogRegBias(fit_intercept=True, lr=0.01, steps=100, lam=0.1, bias=bias, mask=mask)
         clf.fit(X_train, y_train)
         acc, auc = clf.get_acc(X_test, y_test)
         accs.append(acc), aucs.append(auc)
+        # print(acc, auc)
 
     accs, aucs = np.mean(accs), np.mean(aucs)
 
@@ -95,24 +96,19 @@ def eval_ordering(model_list, ds, col_no, train_size, n_trials=10):
     xs_one = ds.get_onehot(col_no)
 
     raw_data, ord_data, onehot_data = [], [], []
-    for s in range(n_trials):
+    for s in range(1, n_trials + 1):
         raw = train_test_split(xs_raw, ys, train_size=train_size, random_state=s, stratify=ys)
-        ord = train_test_split(xs_ord, ys, train_size=train_size, random_state=s, stratify=ys)
+        order = train_test_split(xs_ord, ys, train_size=train_size, random_state=s, stratify=ys)
         one = train_test_split(xs_one, ys, train_size=train_size, random_state=s, stratify=ys)
 
-        raw_data.append(raw), ord_data.append(ord), onehot_data.append(one)
-
-    a, auc = LR_acc(ord_data)
-    print(f'LR ord:   accuracy: {a:.3g}, {auc = :.3g}')
+        raw_data.append(raw), ord_data.append(order), onehot_data.append(one)
 
     for model_type, eval_types in model_list:
-
-
         results = []
         if "raw" in eval_types:
             a, auc = optim_acc(raw_data, model_type)
             results.append(["raw", a, auc])
-        if "ord" in eval_types:
+        if "order" in eval_types:
             a, auc = optim_acc(ord_data, model_type)
             results.append(["ord", a, auc])
         if "onehot" in eval_types:
@@ -121,23 +117,30 @@ def eval_ordering(model_list, ds, col_no, train_size, n_trials=10):
 
         print(f'{model_type}')
         for r in results:
-            print(f'{r[0]}: accuracy: {r[1]:.3g}, auc{r[2]:.3g}')
+            print(f'{r[0]}: accuracy: {r[1]:.3g}, auc: {r[2]:.3g}')
         print()
+
+        with open(f'./results/{model_type}_results.txt', 'a') as f:
+            for r in results:
+                print(f'{train_size} {r[2]:.3g}')
+
+                f.write(f'{r[0]} {train_size} {r[2]:.3g}\n')
 
 
 def main():
-    dl = Dataset(Adult())
+    dl = Dataset(Bank())
     cols = range(len(dl))
 
     print("Using columns:", dl.ds_prop.col_headers[cols])
     print()
 
     # List of models to evaluate
-    model_list = [("LR", ["ord", "onehot"]),
-                  ("XGBoost", ["ord", "onehot"]),
-                  ("CatBoost", ["ord", "onehot"])]
+    model_list = [("LightGBM", ["raw", "order", "onehot"]),
+                  # ("LR", ["order", "onehot"]),
+                  ("XGBoost", ["raw", "order", "onehot"]),
+                  ]
 
-    eval_ordering(model_list, dl, cols, train_size=16, n_trials=100)
+    eval_ordering(model_list, dl, cols, train_size=512, n_trials=100)
 
 
 if __name__ == "__main__":

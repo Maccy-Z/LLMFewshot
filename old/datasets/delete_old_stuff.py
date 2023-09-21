@@ -12,7 +12,7 @@ def delete_if_exists(f):
     print(f, "deleted")
     return
 
-data_dir = "./data"
+data_dir = "data"
 
 datasets = sorted([f for f in os.listdir(data_dir) if os.path.isdir(f'{data_dir}/{f}')])
 

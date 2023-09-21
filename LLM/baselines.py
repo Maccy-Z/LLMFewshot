@@ -1,6 +1,7 @@
 # Evaluate models on batches. Do the actual accuracy evaluation.
 import os, toml, random
 import numpy as np
+import sklearn.base
 from scipy import stats
 from abc import ABC, abstractmethod
 import pandas as pd
@@ -15,6 +16,7 @@ from sklearn.ensemble import RandomForestClassifier
 from catboost import CatBoostClassifier, CatboostError
 from tab_transformer_pytorch import FTTransformer
 from xgboost import XGBClassifier
+import lightgbm as gb
 
 BASEDIR = '.'
 max_batches = 40
@@ -111,35 +113,51 @@ class BasicModel(Model):
 
 
 # Fit model parameters on validation set
-class FittedModel(Model):
-    param_space: dict
-    best_params: dict | None
+class OptimisedModel(Model):
+    param_grid: dict
+    best_params: dict
+    model: sklearn.base.BaseEstimator | CatBoostClassifier
 
     def __init__(self, name):
-        match name:
-            case "LR":
-                self.model = LogisticRegression()
-                self.param_grid = {"penalty": ["l1", "l2"],
-                                   "C": [100, 10, 1, 0.1, 0.01]}
-            case "SVC":
-                self.model = SVC()
-            case "KNN":
-                self.model = KNN()
-            case "CatBoost":
-                self.model = CatBoostClassifier()
-            case "R_Forest":
-                self.model = RandomForestClassifier()
-            case "XGBoost":
-                self.model = XGBClassifier(objective='binary:logistic')
-                self.param_grid = {"max_depth": [4, 6, 8, 10, 12],
-                                   "reg_alpha": [1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1.],
-                                   "reg_lambda": [1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2],
-                                   "eta": [0.01, 0.03, 0.1, 0.3]}
-            case _:
-                raise Exception("Invalid model specified")
-
         self.name = name
         self.identical_batch = False
+        self.best_params = {}
+
+    # Sets model, using best hyperparameters if set. If not, uses default hyperparameters.
+    def set_model(self):
+        match self.name:
+            case "LR":
+                self.model = LogisticRegression(**self.best_params, max_iter=200)
+                self.param_grid = {"C": [1e-2, 1e-3, 1e-4, 1e-5]}
+            case "SVC":
+                self.model = SVC(**self.best_params)
+            case "KNN":
+                self.model = KNN(**self.best_params)
+            case "CatBoost":
+                self.model = CatBoostClassifier(**self.best_params, verbose=False, auto_class_weights='Balanced')
+                self.param_grid = {"iterations": [100, 250, 500, 750],
+                                   "learning_rate": [0.005, 0.01, 0.03],
+                                   "depth": [2, 4, 6, 8],
+                                   "l2_leaf_reg": [1e-8, 1e-6, 1e-4],
+                                   }
+
+            case "R_Forest":
+                self.model = RandomForestClassifier(**self.best_params)
+            case "XGBoost":
+                self.model = XGBClassifier(**self.best_params, objective='binary:logistic')
+                self.param_grid = {"max_depth": [2, 4, 6, 8, 10, 12],
+                                   "reg_alpha": [1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2],
+                                   "reg_lambda": [1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2],
+                                   "eta": [0.01, 0.03, 0.1, 0.3]}
+            case "LightGBM":
+                self.model = gb.LGBMClassifier(**self.best_params, verbosity=-1, num_threads=1)
+                self.param_grid = {"num_leaves": [2, 4, 8, 16, 32, 64, 128, 256],
+                                   "lambda_l1": [1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1., 10.],
+                                   "lambda_l2": [1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1., 10.],
+                                   "learning_rate": [0.01, 0.03, 0.1, 0.3]}
+
+            case _:
+                raise Exception("Invalid model specified")
 
     def fit_params(self, xs_val, ys_val):
         ys_val = ys_val.flatten()
@@ -147,10 +165,15 @@ class FittedModel(Model):
             return
 
         # Find optimal paramters
-        grid_search = GridSearchCV(self.model, self.param_grid, cv=3, scoring='accuracy', verbose=3, n_jobs=7)
+        self.best_params = {}
+        self.set_model()
+        grid_search = GridSearchCV(self.model, self.param_grid, cv=4, scoring='accuracy', verbose=0, n_jobs=7)
         grid_search.fit(xs_val, ys_val)
 
-        self.model = grid_search.best_estimator_
+        # Make model with optimal parameters
+        self.best_params = grid_search.best_params_
+        self.set_model()
+        print(f'{self}, hyperparams: {self.best_params}')
 
     def fit(self, xs_meta, ys_meta):
         ys_meta = ys_meta.flatten()
@@ -161,7 +184,8 @@ class FittedModel(Model):
             self.pred_val = ys_meta[0]
         else:
             self.identical_batch = False
-
+            # Allow calling fit() multiple times by resetting.
+            self.set_model()
             try:
                 self.model.fit(xs_meta, ys_meta)
             except CatboostError:

@@ -19,7 +19,7 @@ class Logger(object):
 
     def __init__(self, fn, ask=True, today=True, rank=0):
         self.rank = rank
-        self.log_path = './logs/'
+        self.log_path = 'logs/'
 
         if self.rank == 0:
             if not os.path.exists(self.log_path):

@@ -20,5 +20,6 @@ RUN pip install toml
 RUN pip install torchdiffeq
 RUN pip install xgboost
 RUN pip install seaborn
+RUN pip install lightgbm
 
 

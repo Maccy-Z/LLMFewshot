@@ -351,7 +351,7 @@ def main(cfg, nametag=None):
 
         # Save stats
         if save_holder is None:
-            save_holder = SaveHolder(".", nametag=nametag, cfg=cfg)
+            save_holder = SaveHolder("", nametag=nametag, cfg=cfg)
         history = {"accs": accs, "loss": losses, "val_accs": val_accs, "val_loss": val_losses, "epoch_no": epoch}
         save_holder.save_model(model, optim, epoch=epoch)
         save_holder.save_history(history)

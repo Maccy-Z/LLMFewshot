@@ -40,10 +40,10 @@ class MLPProto(nn.Module):
 model = torch.load("/home/maccyz/Documents/STUNT-main/logs/model.pt").cpu()
 print(model)
 
-train_x = np.load('./data/income/xtrain.npy')
-train_y = np.load('./data/income/ytrain.npy')
-test_x = np.load('./data/income/xtest.npy')
-test_y = np.load('./data/income/ytest.npy')
+train_x = np.load('data/income/xtrain.npy')
+train_y = np.load('data/income/ytrain.npy')
+test_x = np.load('data/income/xtest.npy')
+test_y = np.load('data/income/ytest.npy')
 train_idx = np.load('./data/income/index{}/train_idx_{}.npy'.format(args.shot_num, args.seed))
 
 print(train_x[train_idx].shape)

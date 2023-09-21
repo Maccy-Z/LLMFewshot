@@ -8,7 +8,7 @@ def split_list(lst, n):
     return [lst[i * k + min(i, m):(i + 1) * k + min(i + 1, m)] for i in range(n)]
 
 
-base_dir = "./data"
+base_dir = "data"
 datasets = [f for f in os.listdir(base_dir) if os.path.isdir(f'{base_dir}/{f}')]
 random.shuffle(datasets)
 

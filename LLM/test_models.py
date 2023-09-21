@@ -66,17 +66,17 @@ def eval_ordering(ds, col_no, train_size, seed):
 
     accs, aucs = [], []
 
-    # print("Baseline")
-    # a, auc = LR_acc(raw)
-    # accs.append(a), aucs.append(auc)
+    print("Baseline")
+    a, auc = LR_acc(raw)
+    accs.append(a), aucs.append(auc)
     #
     print("Ordered")
     a, auc = LR_acc(ord)
     accs.append(a), aucs.append(auc)
 
-    print("One hot")
-    a, auc = LR_acc(one)
-    accs.append(a), aucs.append(auc)
+    # print("One hot")
+    # a, auc = LR_acc(one)
+    # accs.append(a), aucs.append(auc)
     #
     # print("SKL LR")
     # a, auc = base_acc(one, "LR")
@@ -84,25 +84,25 @@ def eval_ordering(ds, col_no, train_size, seed):
     #
 
     #
-    # print("Biased")
-    # bias, mask = ds.get_bias(col_no)
-    # # mask = np.ones_like(mask)
-    # bias, mask = torch.tensor(bias, dtype=torch.float32), torch.tensor(mask, dtype=torch.float32)
-    # mask = torch.ones_like(mask)
-    # a, auc = LR_acc(ord, lam=0.01, bias=bias)
+    print("Biased")
+    bias, mask = ds.get_bias(col_no)
+    # mask = np.ones_like(mask)
+    bias, mask = torch.tensor(bias, dtype=torch.float32), torch.tensor(mask, dtype=torch.float32)
+    mask = torch.ones_like(mask)
+    a, auc = LR_acc(ord, lam=0.01, bias=bias)
+    accs.append(a), aucs.append(auc)
+    #
+    # print("CatBoost base")
+    # a, auc = base_acc(raw, "CatBoost")
     # accs.append(a), aucs.append(auc)
     #
-    print("CatBoost base")
-    a, auc = base_acc(raw, "CatBoost")
-    accs.append(a), aucs.append(auc)
-
-    print("CatBoost ordered")
-    a, auc = base_acc(ord, "CatBoost")
-    accs.append(a), aucs.append(auc)
-    #
-    print("CatBoost one-hot")
-    a, auc = base_acc(one, "CatBoost")
-    accs.append(a), aucs.append(auc)
+    # print("CatBoost ordered")
+    # a, auc = base_acc(ord, "CatBoost")
+    # accs.append(a), aucs.append(auc)
+    # #
+    # print("CatBoost one-hot")
+    # a, auc = base_acc(one, "CatBoost")
+    # accs.append(a), aucs.append(auc)
 
     # print("Monat ordered")
     # a, auc = monat_acc(ord)
@@ -113,15 +113,15 @@ def eval_ordering(ds, col_no, train_size, seed):
 
 def main():
 
-    ds = Adult()
+    ds = Bank()
     dl = Dataset(ds)
     cols = range(len(dl))
     print("Using columns:", ds.col_headers[cols])
 
     accs, aucs = [], []
-    for s in range(10):
+    for s in range(20):
         print()
-        acc, auc = eval_ordering(dl, cols, train_size=32, seed=s)
+        acc, auc = eval_ordering(dl, cols, train_size=16, seed=s)
         accs.append(acc), aucs.append(auc)
 
     accs, aucs = np.array(accs), np.array(aucs)

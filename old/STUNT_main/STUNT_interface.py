@@ -1,11 +1,7 @@
-import time
-import sys
-
-import copy
 import faiss
 from train.metric_based import get_accuracy
 import torch.nn.functional as F
-from data.income import Income, Income2
+from old.STUNT_main.data.income import Income
 import torch
 import torch.nn as nn
 import numpy as np
@@ -348,10 +344,10 @@ def eval():
     # model = MLPProto(input_size, hidden_dim, hidden_dim)
     # model.load_state_dict(load_model.state_dict())
 
-    train_x = np.load('./data/income/xtrain.npy')
-    train_y = np.load('./data/income/ytrain.npy')
-    test_x = np.load('./data/income/xtest.npy')
-    test_y = np.load('./data/income/ytest.npy')
+    train_x = np.load('data/income/xtrain.npy')
+    train_y = np.load('data/income/ytrain.npy')
+    test_x = np.load('data/income/xtest.npy')
+    test_y = np.load('data/income/ytest.npy')
     train_idx = np.load('./data/income/index{}/train_idx_{}.npy'.format(shot_num, seed))
 
     few_train = model(torch.tensor(train_x[train_idx]).float())
