@@ -131,7 +131,7 @@ class Blood:
     }
 
     def read_csv(self):
-        data = pd.read_csv(self.filename)#.iloc[:, :-1]
+        data = pd.read_csv(self.filename)  # .iloc[:, :-1]
         return data
 
 
@@ -235,9 +235,9 @@ class Car:
     def read_csv(self):
         data = pd.read_csv(self.filename)
         print(np.array(data))
-        #data.drop("state", axis=1, inplace=True)  # drop the label
-        #self.col_dtypes = map_dtypes_to_py_types(data.dtypes.values)
-        #self.col_headers = data.columns
+        # data.drop("state", axis=1, inplace=True)  # drop the label
+        # self.col_dtypes = map_dtypes_to_py_types(data.dtypes.values)
+        # self.col_headers = data.columns
         return data
 
 
@@ -456,68 +456,6 @@ class Dataset:
 
     # Map strings to ordered ints
     def str_to_order_int(self, col_no):
-        print(f"Mapping column number {col_no}, {self.col_to_head[col_no]}")
-
-        order_map = {s: i for i, s in enumerate(self.ds_prop.ordered_labels[col_no])}
-        ordered_data = [order_map[s] for s in self.data[:, col_no]]
-        ordered_data = np.array(ordered_data, dtype=float)
-
-        return ordered_data
-
-    def get_ordered(self, col_no):
-        xs = self.ordered_data[:, col_no]
-        if len(xs.shape) == 1:
-            xs = xs[:, np.newaxis]
-
-        mean, std = np.mean(xs, axis=0), np.std(xs, axis=0)
-        xs = (xs - mean) / (std + 1e-3)
-        return xs
-
-    def get_base(self, col_no):
-        xs = self.num_data[:, col_no]
-        if len(xs.shape) == 1:
-            xs = xs[:, np.newaxis]
-
-        mean, std = np.mean(xs, axis=0), np.std(xs, axis=0)
-        xs = (xs - mean) / (std + 1e-3)
-        return xs
-
-    def get_bias(self, col_no):
-        return [self.ds_prop.correl_coef[c] for c in col_no], self.ds_prop.correl_mask[
-            col_no
-        ]
-
-
-class Dataset:
-    def __init__(self, ds_prop):
-        self.ds_prop = ds_prop
-        data_2d_array = ds_prop.read_csv()[:-1]
-        data = np.array(data_2d_array)
-
-        self.data = data
-        self.col_to_head = ds_prop.col_to_head
-        self.col_to_dtype = ds_prop.col_to_dtype
-
-        # Map all data to float
-        numerical_data = []
-        for j in range(data.shape[1]):
-            col = data[:, j]
-            if self.col_to_dtype[j] == str:
-                float_col = map_strings_to_int(col)
-            else:
-                float_col = col.astype(float)
-            numerical_data.append(float_col)
-
-        numerical_data = np.stack(numerical_data).T
-        self.num_data = numerical_data
-
-        # Ordered categorical labels
-        self.ordered_data = numerical_data.copy()
-        for c in ds_prop.ordered_labels.keys():
-            self.ordered_data[:, c] = self.str_to_order_int(c)
-
-    # Map strings to ordered ints
-    def str_to_order_int(self, col_no):
         print(f'Mapping column number {col_no}, {self.col_to_head[col_no]}')
 
         order_map = {s: i for i, s in enumerate(self.ds_prop.ordered_labels[col_no])}
@@ -567,6 +505,56 @@ class Dataset:
         return self.data.shape[1] - 1
 
 
+def balanced_batches(X, y, bs, num_batches, seed=0):
+    """
+    Generator function that yields balanced batches from dataset X with labels y.
+    Each batch will have total_batch_size samples, distributed as evenly as possible among classes.
+
+    Parameters:
+    - X: Features in the dataset.
+    - y: Labels corresponding to X.
+    - total_batch_size: Total number of samples required in the batch.
+    - rng: A numpy random number generator instance for controlled sampling.
+
+    Yields:
+    - X_batch: Features of the sampled batch.
+    - y_batch: Labels corresponding to X_batch.
+    """
+
+    RNG = np.random.default_rng(seed)
+
+    unique_labels = np.unique(y)
+    n_classes = len(unique_labels)
+
+    # Calculate samples per class and determine the "extra" samples
+    samples_per_class = bs // n_classes
+    extra_samples = bs % n_classes
+
+    batches = []
+    for _ in range(num_batches):
+        batch_indices = []
+        for idx, label in enumerate(unique_labels):
+            label_indices = np.where(y == label)[0]
+
+            # Adjust samples for this class if there are extra samples
+            current_samples = samples_per_class + 1 if idx < extra_samples else samples_per_class
+
+            if len(label_indices) < current_samples:
+                raise ValueError(f"Label {label} has fewer samples than the requested samples for this class.")
+
+            sampled_indices = RNG.choice(label_indices, current_samples, replace=False)
+            batch_indices.extend(sampled_indices)
+
+        remainder_indices = np.setdiff1d(np.arange(len(X)), batch_indices)
+
+        X_batch, y_batch = X[batch_indices], y[batch_indices]
+        X_remainder, y_remainder = X[remainder_indices], y[remainder_indices]
+
+        batches.append((X_batch, X_remainder, y_batch, y_remainder))
+    return batches
+
+
+
 def analyse_dataset(ds):
     data = ds.ordered_data
 
@@ -594,4 +582,4 @@ def analyse_dataset(ds):
 
 
 if __name__ == "__main__":
-    analyse_dataset(Dataset(Car()))
+    analyse_dataset(Dataset(Bank()))

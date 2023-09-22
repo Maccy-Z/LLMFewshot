@@ -127,8 +127,8 @@ class OptimisedModel(Model):
     def set_model(self):
         match self.name:
             case "LR":
-                self.model = LogisticRegression(**self.best_params, max_iter=200)
-                self.param_grid = {"C": [1e-2, 1e-3, 1e-4, 1e-5]}
+                self.model = LogisticRegression(**self.best_params, max_iter=200, n_jobs=1)
+                self.param_grid = {"C": [1, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5]}
             case "SVC":
                 self.model = SVC(**self.best_params)
             case "KNN":
@@ -140,7 +140,6 @@ class OptimisedModel(Model):
                                    "depth": [2, 4, 6, 8],
                                    "l2_leaf_reg": [1e-8, 1e-6, 1e-4],
                                    }
-
             case "R_Forest":
                 self.model = RandomForestClassifier(**self.best_params)
             case "XGBoost":
@@ -178,7 +177,7 @@ class OptimisedModel(Model):
     def fit(self, xs_meta, ys_meta):
         ys_meta = ys_meta.flatten()
         if ys_meta.min() == ys_meta.max():
-            print("Catboost error")
+            print("Identical elements in batch")
 
             self.identical_batch = True
             self.pred_val = ys_meta[0]
@@ -188,7 +187,7 @@ class OptimisedModel(Model):
             self.set_model()
             try:
                 self.model.fit(xs_meta, ys_meta)
-            except CatboostError:
+            except CatboostError as e:
                 # Catboost fails if every input element is the same
                 self.identical_batch = True
                 mode = stats.mode(ys_meta, keepdims=False)[0]

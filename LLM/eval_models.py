@@ -1,12 +1,11 @@
 # Evaluate baseline models. Save results to file.
 import numpy as np
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_auc_score
 import torch
 
 from modified_LR import LogRegBias, MonatoneLogReg
 from baselines import BasicModel, OptimisedModel
-from datasets import Dataset, Adult, Bank
+from datasets import Dataset, Adult, Bank, balanced_batches
 
 
 def monat_acc(data):
@@ -71,6 +70,7 @@ def optim_acc(data, model):
 
     accs, aucs = [], []
     for i, (X_train, X_test, y_train, y_test) in enumerate(data):
+
         # Rerun paramter optimisation every few trials to avoid overfitting to single batch
         if i % 20 == 0:
             clf.fit_params(X_train, y_train)
@@ -96,13 +96,9 @@ def eval_ordering(model_list, ds, col_no, train_size, n_trials=10):
     xs_ord = ds.get_ordered(col_no)
     xs_one = ds.get_onehot(col_no)
 
-    raw_data, ord_data, onehot_data = [], [], []
-    for s in range(1, n_trials + 1):
-        raw = train_test_split(xs_raw, ys, train_size=train_size, random_state=s, stratify=ys)
-        order = train_test_split(xs_ord, ys, train_size=train_size, random_state=s, stratify=ys)
-        one = train_test_split(xs_one, ys, train_size=train_size, random_state=s, stratify=ys)
-
-        raw_data.append(raw), ord_data.append(order), onehot_data.append(one)
+    raw_data = balanced_batches(xs_raw, ys, bs=train_size, num_batches=n_trials, seed=0)
+    ord_data = balanced_batches(xs_ord, ys, bs=train_size, num_batches=n_trials, seed=0)
+    onehot_data = balanced_batches(xs_one, ys, bs=train_size, num_batches=n_trials, seed=0)
 
     for model_type, eval_types in model_list:
         results = []
@@ -136,12 +132,13 @@ def main():
     print()
 
     # List of models to evaluate
-    model_list = [("LightGBM", ["raw", "order", "onehot"]),
-                  # ("LR", ["order", "onehot"]),
-                  ("XGBoost", ["raw", "order", "onehot"]),
-                  ]
+    model_list = [
+        # ("LightGBM", ["raw", "order", "onehot"]),
+        ("LR", ['raw', "order", "onehot"]),
+        # ("XGBoost", ["raw", "order", "onehot"]),
+    ]
 
-    for size in [4, 8, 16, 32, 64, 128, 256, 512]:
+    for size in [8]:
         eval_ordering(model_list, dl, cols, train_size=size, n_trials=100)
 
 
