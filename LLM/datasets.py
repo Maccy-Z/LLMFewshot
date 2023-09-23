@@ -2,7 +2,7 @@ import csv
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LinearRegression
-from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from scipy.io import arff
 
 
@@ -469,8 +469,8 @@ class Dataset:
         if len(xs.shape) == 1:
             xs = xs[:, np.newaxis]
 
-        mean, std = np.mean(xs, axis=0), np.std(xs, axis=0)
-        xs = (xs - mean) / (std + 1e-3)
+        scalar = StandardScaler().fit(xs)
+        xs = scalar.transform(xs)
         return xs
 
     def get_base(self, col_no):
@@ -478,8 +478,8 @@ class Dataset:
         if len(xs.shape) == 1:
             xs = xs[:, np.newaxis]
 
-        mean, std = np.mean(xs, axis=0), np.std(xs, axis=0)
-        xs = (xs - mean) / (std + 1e-3)
+        scalar = StandardScaler().fit(xs)
+        xs = scalar.transform(xs)
         return xs
 
     def get_bias(self, col_no):
@@ -552,7 +552,6 @@ def balanced_batches(X, y, bs, num_batches, seed=0):
 
         batches.append((X_batch, X_remainder, y_batch, y_remainder))
     return batches
-
 
 
 def analyse_dataset(ds):

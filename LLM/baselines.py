@@ -5,9 +5,9 @@ import sklearn.base
 from scipy import stats
 from abc import ABC, abstractmethod
 import pandas as pd
-from collections import defaultdict
-from sklearn.model_selection import train_test_split, GridSearchCV
+from collections import Counter
 
+from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold, KFold
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier as KNN
@@ -128,7 +128,7 @@ class OptimisedModel(Model):
         match self.name:
             case "LR":
                 self.model = LogisticRegression(**self.best_params, max_iter=200, n_jobs=1)
-                self.param_grid = {"C": [1, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5]}
+                self.param_grid = {"C": [10, 1, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5]}
             case "SVC":
                 self.model = SVC(**self.best_params)
             case "KNN":
@@ -150,10 +150,10 @@ class OptimisedModel(Model):
                                    "eta": [0.01, 0.03, 0.1, 0.3]}
             case "LightGBM":
                 self.model = gb.LGBMClassifier(**self.best_params, verbosity=-1, num_threads=1)
-                self.param_grid = {"num_leaves": [2, 4, 8, 16, 32, 64, 128, 256],
-                                   "lambda_l1": [1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1., 10.],
-                                   "lambda_l2": [1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1., 10.],
-                                   "learning_rate": [0.01, 0.03, 0.1, 0.3]}
+                self.param_grid = {"num_leaves": [2, 4, 8, 16, 32, 64],
+                                   "lambda_l1": [1e-8, 1e-6, 1e-4, 1e-2, 1e-1],
+                                   "lambda_l2": [1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-2, 1e-1],
+                                   "learning_rate": [0.01, 0.03, 0.1]}
 
             case _:
                 raise Exception("Invalid model specified")
@@ -166,12 +166,22 @@ class OptimisedModel(Model):
         # Find optimal paramters
         self.best_params = {}
         self.set_model()
-        grid_search = GridSearchCV(self.model, self.param_grid, cv=4, scoring='accuracy', verbose=0, n_jobs=8)
+        folds = min(Counter(ys_val).values()) if min(Counter(ys_val).values()) < 4 else 4
+        if folds > 1:
+            inner_cv = StratifiedKFold(n_splits=folds, shuffle=True, random_state=0)
+        else:
+            folds = 2
+            print(f"Warning: Increased folds from {folds} to 2 (even though not enough labels) and use simple KFold.")
+
+            inner_cv = KFold(n_splits=folds, shuffle=True, random_state=0)
+
+        grid_search = GridSearchCV(self.model, self.param_grid, cv=inner_cv, scoring='roc_auc', verbose=0, n_jobs=8)
+
         grid_search.fit(xs_val, ys_val)
 
         # Make model with optimal parameters
         self.best_params = grid_search.best_params_
-        self.set_model()
+
         print(f'{self}, hyperparams: {self.best_params}')
 
     def fit(self, xs_meta, ys_meta):
@@ -183,7 +193,7 @@ class OptimisedModel(Model):
             self.pred_val = ys_meta[0]
         else:
             self.identical_batch = False
-            # Allow calling fit() multiple times by resetting.
+            # Allow calling fit() multiple times by resetting model each time.
             self.set_model()
             try:
                 self.model.fit(xs_meta, ys_meta)

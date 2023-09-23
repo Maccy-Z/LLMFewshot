@@ -2,6 +2,7 @@
 import numpy as np
 from sklearn.metrics import roc_auc_score
 import torch
+import datetime
 
 from modified_LR import LogRegBias, MonatoneLogReg
 from baselines import BasicModel, OptimisedModel
@@ -86,7 +87,7 @@ def optim_acc(data, model):
     accs, aucs = np.array(accs), np.array(aucs)
     accs, aucs = np.mean(accs), np.mean(aucs)
 
-    return accs, aucs
+    return accs, aucs, np.std(aucs)
 
 
 def eval_ordering(model_list, ds, col_no, train_size, n_trials=10):
@@ -103,25 +104,29 @@ def eval_ordering(model_list, ds, col_no, train_size, n_trials=10):
     for model_type, eval_types in model_list:
         results = []
         if "raw" in eval_types:
-            a, auc = optim_acc(raw_data, model_type)
-            results.append(["raw", a, auc])
+            a, auc, std = optim_acc(raw_data, model_type)
+            results.append(["raw", a, auc, std])
         if "order" in eval_types:
-            a, auc = optim_acc(ord_data, model_type)
-            results.append(["ord", a, auc])
+            a, auc, std = optim_acc(ord_data, model_type)
+            results.append(["raw", a, auc, std])
         if "onehot" in eval_types:
-            a, auc = optim_acc(onehot_data, model_type)
-            results.append(["onehot", a, auc])
+            a, auc, std = optim_acc(onehot_data, model_type)
+            results.append(["raw", a, auc, std])
 
         print(f'{model_type}')
         for r in results:
             print(f'{r[0]}: accuracy: {r[1]:.3g}, auc: {r[2]:.3g}')
         print()
 
+        # Append results to file. Include time of current save to seperate saves.
+        now = datetime.datetime.now()
+        now_fmt = now.strftime("%d/%m/%Y %H:%M:%S")
         with open(f'./results/{model_type}_results.txt', 'a') as f:
+            f.write(f'\n{now_fmt}\n')
             for r in results:
                 print(f'{train_size} {r[2]:.3g}')
 
-                f.write(f'{r[0]} {train_size} {r[2]:.3g}\n')
+                f.write(f'{r[0]} {train_size} {r[1]:.3g}, {r[2]:.3g}, {r[3]:.3g}\n')
 
 
 def main():
@@ -133,13 +138,13 @@ def main():
 
     # List of models to evaluate
     model_list = [
-        # ("LightGBM", ["raw", "order", "onehot"]),
+        ("LightGBM", ["raw", "order", "onehot"]),
         ("LR", ['raw', "order", "onehot"]),
-        # ("XGBoost", ["raw", "order", "onehot"]),
+        ("XGBoost", ["raw", "order", "onehot"]),
     ]
 
-    for size in [8]:
-        eval_ordering(model_list, dl, cols, train_size=size, n_trials=100)
+    for size in [4, 8, 16]:
+        eval_ordering(model_list, dl, cols, train_size=size, n_trials=120)
 
 
 if __name__ == "__main__":
