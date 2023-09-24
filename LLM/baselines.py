@@ -175,7 +175,8 @@ class OptimisedModel(Model):
 
             inner_cv = KFold(n_splits=folds, shuffle=True, random_state=0)
 
-        grid_search = GridSearchCV(self.model, self.param_grid, cv=inner_cv, scoring='roc_auc', verbose=0, n_jobs=8)
+
+        grid_search = GridSearchCV(self.model, self.param_grid, cv=inner_cv, scoring='roc_auc_ovr', verbose=0, n_jobs=8)
 
         grid_search.fit(xs_val, ys_val)
 

@@ -40,14 +40,6 @@ class LogRegBias(nn.Module, Model):
         self.xs_meta, self.ys_meta = xs_meta, ys_meta
         dims = xs_meta.shape
 
-        # Weighting
-        # num_neg = (ys_meta == 0).sum().item()
-        # num_pos = (ys_meta == 1).sum().item()
-        # tot = num_pos + num_neg
-        # weight_neg = tot / (2 * num_neg + 1e-4)
-        # weight_pos = tot / (2 * num_pos + 1e-4)
-        # weights = torch.where(ys_meta == 1, weight_pos, weight_neg)
-
         self.loss_fn = nn.BCELoss()
         self.linear = nn.Linear(dims[1], 1, bias=self.fit_intercept)
         self.linear.weight.data.fill_(0.0)
@@ -151,11 +143,12 @@ class MonatoneLogReg(nn.Module, Model):
     xs_holder: DataHolder
     n_cols: int
 
-    def __init__(self, lr, steps, lam):
+    def __init__(self, lr, steps, lam, bias: torch.Tensor):
         super().__init__()
         self.steps = steps
         self.lr = lr
         self.lam = lam
+        self.bias = bias
 
     def forward(self, x):
         return torch.sigmoid(self.linear(x))
@@ -179,29 +172,10 @@ class MonatoneLogReg(nn.Module, Model):
         self.linear.bias.data.fill_(0.0)
         self.optimizer = torch.optim.SGD(self.parameters(), lr=self.lr, momentum=0.9)
 
-        num_neg = (ys_meta == 0).sum().item()
-        num_pos = (ys_meta == 1).sum().item()
-        tot = num_pos + num_neg
-        weight_neg = tot / (2 * num_neg + 1e-4)
-        weight_pos = tot / (2 * num_pos + 1e-4)
-        weights = torch.where(ys_meta == 1, weight_pos, weight_neg)
-        self.loss_fn = nn.BCELoss(weight=weights)
+        self.loss_fn = nn.BCELoss()
 
         for i in range(self.steps):
             self.train_step()
-
-    # Single optimisation step
-    def train_step(self):
-        self.optimizer.zero_grad()
-
-        preds, beta_effs = self.forward_step(self.xs_holder)
-
-        loss = self.loss_fn(preds, self.ys_meta)
-        loss += torch.mean(torch.stack(beta_effs)) * self.lam
-        loss.backward()
-        self.optimizer.step()
-
-        return loss
 
     # Return predictions from a batch of data
     def forward_step(self, xs_holder) -> np.array:
@@ -220,16 +194,29 @@ class MonatoneLogReg(nn.Module, Model):
             # Get effective beta
             ys = mapped_col - zero_val
             ys = ys * self.linear.weight[0, col]
-            beta_eff = torch.mean(ys ** 2/(xs_unique ** 2 + 0.01))
+            # Stop div by zero by clamping
+            xs_clamp = torch.clamp(xs_unique, min=0.0015) + torch.clamp(xs_unique, max=-0.001)#torch.clamp(xs_unique, min=0.01, max=-0.01).sign() * torch.clamp(xs_unique.abs(), min=0.001)
+            beta_eff = torch.mean(ys / xs_clamp)
 
             beta_effs.append(beta_eff)
 
-        #print(beta_effs)
 
         # Multiply by weights
         preds = self.forward(xs_monatone)
 
-        return preds, beta_effs
+        return preds, torch.stack(beta_effs)
+
+    # Single optimisation step
+    def train_step(self):
+        self.optimizer.zero_grad()
+
+        preds, beta_effs = self.forward_step(self.xs_holder)
+        reg_loss = torch.sum((beta_effs - self.bias) ** 2)
+        loss = self.loss_fn(preds, self.ys_meta) + reg_loss * self.lam
+        loss.backward()
+        self.optimizer.step()
+        self.betas = beta_effs
+        return loss
 
     # Return test accuracy and auc
     def get_acc(self, xs_target, ys_target):
@@ -266,7 +253,7 @@ class MonatoneLogReg(nn.Module, Model):
                 preds = beta * preds
 
             plt.plot(xs, preds)
-            plt.ylim([-7, 7])
+            plt.ylim([-3, 3])
             plt.title(col)
             plt.show()
 
@@ -308,7 +295,7 @@ def test_logistic_regression():
     X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.8, random_state=42)
 
     # Create and train the model
-    model = MonatoneLogReg(lr=0.02, steps=50)
+    model = MonatoneLogReg(lr=0.02, steps=50, lam=0.5, bias=0.)
     model.fit(X_train, y_train)
 
     # Make predictions
@@ -326,7 +313,7 @@ def test_logistic_regression():
         monatone_model = model.monatone_map[i]
         plot_net(monatone_model, beta[i], model.linear.weight[0, i], i)
 
-    #model.plot_net()
+    # model.plot_net()
 
 
 if __name__ == "__main__":

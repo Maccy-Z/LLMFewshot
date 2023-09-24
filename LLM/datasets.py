@@ -41,7 +41,8 @@ class Adult:
             for row in reader:
                 cleaned_row = [entry.replace(' ', '') for entry in row]
                 data.append(cleaned_row)
-        return data
+
+        return data[:-1]
 
 
 class Bank:
@@ -149,9 +150,9 @@ class California:
             "households",
             "median_income",
             "ocean_proximity",
+            "median_house_value",
         ]
     )
-    # col_dtypes = [int, int, int, int]
     col_dtypes = []
 
     # ChatGPT-4 generated orderings:
@@ -167,12 +168,11 @@ class California:
         5: -1,
         6: 1,
         7: 1,
-        8: 1,
+        8: -1
     }
 
     # Process data
-    col_to_head = {i: h for i, h in enumerate(col_headers)}
-    col_to_dtype = {i: d for i, d in enumerate(col_dtypes)}
+
     correl_mask = np.array(
         [1 if coef is not None else 0 for coef in correl_coef.values()]
     )
@@ -182,15 +182,23 @@ class California:
 
     def read_csv(self):
         data = pd.read_csv(self.filename)
-        data.drop("median_house_value", axis=1, inplace=True)  # drop the label; dont forget to make this binary
+        data["temp"] = data["median_house_value"]
+        data = data.drop(columns='median_house_value').rename(columns={'temp': 'median_house_value'})
+
         self.col_dtypes = map_dtypes_to_py_types(data.dtypes.values)
         self.col_headers = data.columns
+        self.col_to_head = {i: h for i, h in enumerate(self.col_headers)}
+        self.col_to_dtype = {i: d for i, d in enumerate(self.col_dtypes)}
+
+        median = data['median_house_value'].median()
+        data['median_house_value'] = data['median_house_value'].apply(lambda x: 1 if x > median else 0)
+        data = data.dropna()
         return data
 
 
 # DONE
 class Car:
-    filename = "car.csv/car_evaluation.csv"
+    filename = "car/car_evaluation.csv"
     col_headers = np.array(
         [
             "buying",
@@ -206,9 +214,9 @@ class Car:
 
     # ChatGPT-4 generated orderings:
     ordered_labels = {
-        0: ["high", "med", "low", "v-high"],
-        1: ["high", "med", "low", "v-high"],
-        2: ["4", "5-more", "3", "2"],
+        0: ["high", "med", "low", "vhigh"],
+        1: ["high", "med", "low", "vhigh"],
+        2: ["4", "5more", "3", "2"],
         3: ["more", "4", "2"],
         4: ["big", "med", "small"],
         5: ["high", "med", "low"],
@@ -234,10 +242,12 @@ class Car:
 
     def read_csv(self):
         data = pd.read_csv(self.filename)
-        print(np.array(data))
         # data.drop("state", axis=1, inplace=True)  # drop the label
-        # self.col_dtypes = map_dtypes_to_py_types(data.dtypes.values)
-        # self.col_headers = data.columns
+        self.col_dtypes = map_dtypes_to_py_types(data.dtypes.values)
+        self.col_headers = data.columns
+        self.col_to_head = {i: h for i, h in enumerate(self.col_headers)}
+        self.col_to_dtype = {i: d for i, d in enumerate(self.col_dtypes)}
+        #print(data.to_numpy())
         return data
 
 
@@ -254,6 +264,7 @@ class Diabetes:
             "BMI",
             "DiabetesPedigreeFunction",
             "Age",
+            "Outcome",
         ]
     )
 
@@ -286,9 +297,11 @@ class Diabetes:
 
     def read_csv(self):
         data = pd.read_csv(self.filename)
-        data.drop("Outcome", axis=1, inplace=True)  # drop the label
+        #data.drop("Outcome", axis=1, inplace=True)  # drop the label
         self.col_dtypes = map_dtypes_to_py_types(data.dtypes.values)
         self.col_headers = data.columns
+        self.col_to_head = {i: h for i, h in enumerate(self.col_headers)}
+        self.col_to_dtype = {i: d for i, d in enumerate(self.col_dtypes)}
         return data
 
 
@@ -330,7 +343,7 @@ class Heart:
         7: 0,  #
         8: 1,  #
         9: 1,  #
-        10: 1,
+        10: -1,
     }
 
     # Process data
@@ -345,9 +358,12 @@ class Heart:
 
     def read_csv(self):
         data = pd.read_csv(self.filename)
-        data.drop('HeartDisease', axis=1, inplace=True)  # drop the label
+        #data.drop('HeartDisease', axis=1, inplace=True)  # drop the label
         self.col_dtypes = map_dtypes_to_py_types(data.dtypes.values)
         self.col_headers = data.columns
+        self.col_to_head = {i: h for i, h in enumerate(self.col_headers)}
+        self.col_to_dtype = {i: d for i, d in enumerate(self.col_dtypes)}
+
         return data
 
 
@@ -393,9 +409,14 @@ class Jungle:
     def read_csv(self):
         data = arff.loadarff(self.filename)
         data = pd.DataFrame(data[0])
-        data.drop('class', axis=1, inplace=True)  # drop the label
+        #data.drop('class', axis=1, inplace=True)  # drop the label
         self.col_dtypes = map_dtypes_to_py_types(data.dtypes.values)
         self.col_headers = data.columns
+        self.col_to_head = {i: h for i, h in enumerate(self.col_headers)}
+        self.col_to_dtype = {i: d for i, d in enumerate(self.col_dtypes)}
+
+        # Binarise to white win
+        data["class"] = data["class"] == b"w"
         return data
 
 
@@ -429,7 +450,7 @@ def map_dtypes_to_py_types(column_dtypes):
 class Dataset:
     def __init__(self, ds_prop):
         self.ds_prop = ds_prop
-        data_2d_array = ds_prop.read_csv()[:-1]
+        data_2d_array = ds_prop.read_csv()#[:-1]
         data = np.array(data_2d_array)
 
         self.data = data
@@ -440,6 +461,7 @@ class Dataset:
         numerical_data = []
         for j in range(data.shape[1]):
             col = data[:, j]
+
             if self.col_to_dtype[j] == str:
                 float_col = map_strings_to_int(col)
             else:
@@ -557,7 +579,7 @@ def balanced_batches(X, y, bs, num_batches, seed=0):
 def analyse_dataset(ds):
     data = ds.ordered_data
 
-    col = 3
+    col = 2
 
     print()
     print(ds.ds_prop.col_headers[col])
@@ -581,4 +603,4 @@ def analyse_dataset(ds):
 
 
 if __name__ == "__main__":
-    analyse_dataset(Dataset(Bank()))
+    analyse_dataset(Dataset(Heart()))
