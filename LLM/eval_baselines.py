@@ -22,16 +22,22 @@ def optim_acc(data, model):
             continue
 
         clf.fit(X_train, y_train)
-        acc = clf.get_acc(X_test, y_test).mean()
+
         if len(set(y_test)) == 2:
             # Binary classification
-            y_prob = clf.predict_proba(X_test)[:, -1]
-            auc = roc_auc_score(y_test, y_prob)
+            y_prob = clf.predict_proba(X_test)
+            preds = np.argmax(y_prob, axis=1)
+
+            acc = np.mean(preds == y_test)
+            auc = roc_auc_score(y_test, y_prob[:, -1])
 
         else:
             # Multiclass classification
-            y_prob = clf.predict_proba(X_test)#[:, -1]
+            y_prob = clf.predict_proba(X_test)  # [:, -1]
             auc = roc_auc_score(y_test, y_prob, multi_class='ovr', average='macro')
+
+            preds = np.argmax(y_prob, axis=1)
+            acc = np.mean(preds == y_test)
 
         accs.append(acc), aucs.append(auc)
 
@@ -82,7 +88,7 @@ def eval_ordering(model_list, ds, col_no, train_size, n_trials=10):
 
 def main():
     # TODO: Enter dataset here.
-    dl = Dataset(Jungle())
+    dl = Dataset(Adult())
     cols = range(len(dl))
 
     print("Using columns:", dl.ds_prop.col_headers[cols])
@@ -93,7 +99,7 @@ def main():
         # ("LightGBM", ["raw", "order", "onehot"]),
         # ("LR", ['raw', "order", "onehot"]),
         # ("XGBoost", ["raw", "order", "onehot"]),
-        ("TabPFN", ["raw", "order", "onehot"]),
+        ("LR", ["raw", "order", "onehot"]),
     ]
 
     for size in [4, 8, 16, 32, 64, 128, 256, 512]:

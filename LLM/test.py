@@ -1,58 +1,112 @@
+# Evaluate baseline models. Save results to file.
 import numpy as np
+from sklearn.metrics import roc_auc_score
+import torch
+import datetime
+import time
+
+from modified_LR import LogRegBias, MonatoneLogReg
+from baselines import BasicModel, OptimisedModel
+from datasets import (Dataset, Adult, Bank, Blood, balanced_batches,
+                      California, Diabetes, Heart, Jungle, Car)
+
+# Evaluate model and fit hyperparameters
+def optim_acc(data, model):
+    clf = OptimisedModel(model)
+
+    accs, aucs = [], []
+    for i, (X_train, X_test, y_train, y_test) in enumerate(data):
+
+        # Rerun paramter optimisation every few trials to avoid overfitting to single batch
+        st = time.time()
+        clf.fit_params(X_train, y_train)
+        print(f'{time.time() - st} Hyperparam tune time')
+        st = time.time()
+
+        clf.fit(X_train, y_train)
+        print(f'{time.time() - st} Train time')
+        st = time.time()
+
+        if len(set(y_test)) == 2:
+            # Binary classification
+            y_prob = clf.predict_proba(X_test)
+            preds = np.argmax(y_prob, axis=1)
+
+            acc = np.mean(preds == y_test)
+            auc = roc_auc_score(y_test, y_prob[:, -1])
+        else:
+            # Multiclass classification
+            y_prob = clf.predict_proba(X_test)#[:, -1]
+            auc = roc_auc_score(y_test, y_prob, multi_class='ovr', average='macro')
+
+            preds = np.argmax(y_prob, axis=1)
+            acc = np.mean(preds == y_test)
+
+        print(f'{st - time.time()} auc time')
+        st = time.time()
+
+        accs, aucs = np.array(accs), np.array(aucs)
+        std = np.std(aucs)
+        accs, aucs = np.mean(accs), np.mean(aucs)
+        accs.append(acc), aucs.append(auc)
+
+    return accs, aucs, std
 
 
-def sample_balanced_batches(X, y, bs, num_batches, seed=0):
-    """
-    Generator function that yields balanced batches from dataset X with labels y.
-    Each batch will have total_batch_size samples, distributed as evenly as possible among classes.
+def eval_ordering(model_list, ds, col_no, train_size, n_trials=10):
+    ys = ds.num_data[:, -1]
 
-    Parameters:
-    - X: Features in the dataset.
-    - y: Labels corresponding to X.
-    - total_batch_size: Total number of samples required in the batch.
-    - rng: A numpy random number generator instance for controlled sampling.
+    xs_raw = ds.get_base(col_no)
+    xs_ord = ds.get_ordered(col_no)
+    xs_one = ds.get_onehot(col_no)
 
-    Yields:
-    - X_batch: Features of the sampled batch.
-    - y_batch: Labels corresponding to X_batch.
-    """
+    raw_data = balanced_batches(xs_raw, ys, bs=train_size, num_batches=n_trials, seed=0)
+    ord_data = balanced_batches(xs_ord, ys, bs=train_size, num_batches=n_trials, seed=0)
+    onehot_data = balanced_batches(xs_one, ys, bs=train_size, num_batches=n_trials, seed=0)
+    for model_type, eval_types in model_list:
+        results = []
+        if "raw" in eval_types:
+            a, auc, std = optim_acc(raw_data, model_type)
+            results.append(["raw", a, auc, std])
+        if "order" in eval_types:
+            a, auc, std = optim_acc(ord_data, model_type)
+            results.append(["raw", a, auc, std])
+        if "onehot" in eval_types:
+            a, auc, std = optim_acc(onehot_data, model_type)
+            results.append(["raw", a, auc, std])
 
-    RNG = np.random.default_rng(seed)
+        print(f'{model_type}')
+        for r in results:
+            print(f'{r[0]}: accuracy: {r[1]:.3g}, auc: {r[2]:.3g}')
+        print()
 
-    unique_labels = np.unique(y)
-    n_classes = len(unique_labels)
+        # Append results to file. Include time of current save to seperate saves.
+        now = datetime.datetime.now()
+        now_fmt = now.strftime("%d/%m/%Y %H:%M:%S")
+        with open(f'./results/{model_type}_results.txt', 'a') as f:
+            f.write(f'\n{now_fmt}\n')
+            for r in results:
+                print(f'{train_size} {r[2]:.3g}')
 
-    # Calculate samples per class and determine the "extra" samples
-    samples_per_class = bs // n_classes
-    extra_samples = bs % n_classes
-
-    batches = []
-    for _ in range(num_batches):
-        batch_indices = []
-        for idx, label in enumerate(unique_labels):
-            label_indices = np.where(y == label)[0]
-
-            # Adjust samples for this class if there are extra samples
-            current_samples = samples_per_class + 1 if idx < extra_samples else samples_per_class
-
-            if len(label_indices) < current_samples:
-                raise ValueError(f"Label {label} has fewer samples than the requested samples for this class.")
-
-            sampled_indices = RNG.choice(label_indices, current_samples, replace=False)
-            batch_indices.extend(sampled_indices)
-
-        remainder_indices = np.setdiff1d(np.arange(len(X)), batch_indices)
-
-        X_batch, y_batch = X[batch_indices], y[batch_indices]
-        X_remainder, y_remainder = X[remainder_indices], y[remainder_indices]
-
-        batches.append((X_batch, y_batch, X_remainder, y_remainder))
-    return batches
+                f.write(f'{r[0]} {train_size} {r[1]:.3g}, {r[2]:.3g}, {r[3]:.3g}\n')
 
 
-X = np.array([[1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 8], [8, 9], [9, 10], [10, 11]])
-y = np.array([0, 1, 2, 0, 1, 2, 0, 1, 2, 0])
+def main():
+    # TODO: Enter dataset here.
+    dl = Dataset(Adult())
+    cols = range(len(dl))
 
-X_batch = sample_balanced_batches(X, y, bs=9, num_batches=5, seed=2)
+    print("Using columns:", dl.ds_prop.col_headers[cols])
+    print()
 
-print("Sampled X batch:", X_batch[0])
+    # List of models to evaluate
+    model_list = [
+        ("TabPFN", ["raw", "order", "onehot"]),
+    ]
+
+    for size in [4,]:
+        eval_ordering(model_list, dl, cols, train_size=size, n_trials=2)
+
+
+if __name__ == "__main__":
+    main()
