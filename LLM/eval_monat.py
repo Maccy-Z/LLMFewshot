@@ -99,11 +99,13 @@ def eval_ordering(ds, col_no, size, train_size, n_trials=10):
 
 
 def main():
-    dl = Dataset(Adult())
+    dl = Dataset(Jungle())
     cols = range(len(dl))
 
     print("Using columns:", dl.ds_prop.col_headers[cols])
     print()
+
+
 
     # List of models to evaluate
     for size in [4, 8, 16, 32, 64, 128, 256, 512]:

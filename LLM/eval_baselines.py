@@ -94,7 +94,7 @@ def main():
         ("XGBoost", ["raw", "order", "onehot"]),
     ]
 
-    for size in [ 512]:
+    for size in [4, 8, 16, 32, 64, 128, 256, 512]:
         eval_ordering(model_list, dl, cols, train_size=size, n_trials=10)
 
 
