@@ -89,13 +89,14 @@ def main():
 
     # List of models to evaluate
     model_list = [
-        ("LightGBM", ["raw", "order", "onehot"]),
-        ("LR", ['raw', "order", "onehot"]),
-        ("XGBoost", ["raw", "order", "onehot"]),
+        # ("LightGBM", ["raw", "order", "onehot"]),
+        # ("LR", ['raw', "order", "onehot"]),
+        # ("XGBoost", ["raw", "order", "onehot"]),
+        ("TabPFN", ["raw", "order", "onehot"]),
     ]
 
     for size in [4, 8, 16, 32, 64, 128, 256, 512]:
-        eval_ordering(model_list, dl, cols, train_size=size, n_trials=10)
+        eval_ordering(model_list, dl, cols, train_size=size, n_trials=120)
 
 
 if __name__ == "__main__":
