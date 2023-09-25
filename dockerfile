@@ -21,5 +21,7 @@ RUN pip install torchdiffeq
 RUN pip install xgboost
 RUN pip install seaborn
 RUN pip install lightgbm
+RUN pip install tabpfn
+
 
 

@@ -17,6 +17,7 @@ from catboost import CatBoostClassifier, CatboostError
 from tab_transformer_pytorch import FTTransformer
 from xgboost import XGBClassifier
 import lightgbm as gb
+from tabpfn import TabPFNClassifier
 
 BASEDIR = '.'
 max_batches = 40
@@ -68,6 +69,8 @@ class BasicModel(Model):
                 self.model = RandomForestClassifier(n_estimators=150, n_jobs=5)
             case "XGBoost":
                 self.model = XGBClassifier(n_estimators=150, n_jobs=8)
+            case "TabPFN":
+                self.model = TabPFNClassifier(device="cpu", N_ensemble_configurations=32)
             case _:
                 raise Exception("Invalid model specified")
 
@@ -154,7 +157,9 @@ class OptimisedModel(Model):
                                    "lambda_l1": [1e-8, 1e-6, 1e-4, 1e-2, 1e-1],
                                    "lambda_l2": [1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-2, 1e-1],
                                    "learning_rate": [0.01, 0.03, 0.1]}
-
+            case "TabPFN":
+                self.model = TabPFNClassifier(device="cpu", N_ensemble_configurations=32)
+                self.param_grid = {"N_ensemble_configurations":[16, 32, 64]}
             case _:
                 raise Exception("Invalid model specified")
 
