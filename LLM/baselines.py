@@ -158,8 +158,8 @@ class OptimisedModel(Model):
                                    "lambda_l2": [1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-2, 1e-1],
                                    "learning_rate": [0.01, 0.03, 0.1]}
             case "TabPFN":
-                self.model = TabPFNClassifier(device="cpu")
-                self.param_grid = {"N_ensemble_configurations": [16, 32, 64]}
+                self.model = TabPFNClassifier(device="cpu", batch_size_inference=32)
+                self.param_grid = {}
             case _:
                 raise Exception("Invalid model specified")
 

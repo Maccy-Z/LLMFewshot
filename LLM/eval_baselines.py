@@ -2,7 +2,7 @@
 import numpy as np
 from sklearn.metrics import roc_auc_score
 import torch
-import datetime
+import datetime, time
 
 from modified_LR import LogRegBias, MonatoneLogReg
 from baselines import BasicModel, OptimisedModel
@@ -99,7 +99,7 @@ def main():
         # ("LightGBM", ["raw", "order", "onehot"]),
         # ("LR", ['raw', "order", "onehot"]),
         # ("XGBoost", ["raw", "order", "onehot"]),
-        ("LR", ["raw", "order", "onehot"]),
+        ("TabPFN", ["raw", "order", "onehot"]),
     ]
 
     for size in [4, 8, 16, 32, 64, 128, 256, 512]:
