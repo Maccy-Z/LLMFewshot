@@ -193,6 +193,7 @@ class California:
         median = data['median_house_value'].median()
         data['median_house_value'] = data['median_house_value'].apply(lambda x: 1 if x > median else 0)
         data = data.dropna()
+        #[print(c) for c in data.columns]
         return data
 
 
@@ -486,6 +487,14 @@ class Dataset:
 
         return ordered_data
 
+
+    def get_unnormaliesd(self, col_no):
+        xs = self.data[:, col_no]
+        if len(xs.shape) == 1:
+            xs = xs[:, np.newaxis]
+
+        return xs
+
     def get_ordered(self, col_no):
         xs = self.ordered_data[:, col_no]
         if len(xs.shape) == 1:
@@ -576,10 +585,8 @@ def balanced_batches(X, y, bs, num_batches, seed=0):
     return batches
 
 
-def analyse_dataset(ds):
+def analyse_dataset(ds, col):
     data = ds.ordered_data
-
-    col = 2
 
     print()
     print(ds.ds_prop.col_headers[col])
@@ -599,8 +606,12 @@ def analyse_dataset(ds):
 
     for x in ds.ds_prop.ordered_labels[col]:
         idx = (ds.data[:, col] == x)
-        print(f"{x}: {np.mean(ds.num_data[idx, -1])}")
+        print(f"{x}: {np.mean(ds.num_data[idx, -1]):.3g}")
 
 
 if __name__ == "__main__":
-    analyse_dataset(Dataset(Heart()))
+    ds = Dataset(California())
+    x = ds.get_unnormaliesd(range(9))
+    print(x[1])
+
+    analyse_dataset(ds, col=7)

@@ -239,40 +239,20 @@ class MonatoneLogReg(nn.Module, Model):
         raise NotImplementedError
 
     # Plot predictions of model
-    def plot_net(self):
-
+    def plot_net(self, get_col):
         cols = range(self.n_cols)
         for col in cols:
             xs = self.xs_holder.get_unique(col)
+            mask = (xs != 0.)
             model = self.monatone_map[col]
             with torch.no_grad():
                 preds = model.forward(xs)
-                # preds = self.xs_holder.reconstruct(col, preds)
 
                 beta = self.linear.weight[0, col]
                 preds = beta * preds
 
-            plt.plot(xs, preds)
-            plt.ylim([-3, 3])
-            plt.title(col)
-            plt.show()
-
-
-# Plot predictions of model
-def plot_net(model: nn.Module, beta, model_beta, i):
-    xs = torch.linspace(-3., 3, 100)
-    model.train(False)
-
-    with torch.no_grad():
-        preds = model.forward(xs)
-        preds = (preds - preds[50]) * model_beta
-
-    true_logit = beta * torch.relu(xs)
-    plt.plot(xs, preds)
-    plt.plot(xs, true_logit)
-    plt.ylim([-7, 7])
-    plt.title(i)
-    plt.show()
+            if col == get_col:
+                return xs[mask], preds[mask]
 
 
 def test_logistic_regression():
