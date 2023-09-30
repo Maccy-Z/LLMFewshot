@@ -8,7 +8,7 @@ from multiprocessing import Pool
 from modified_LR import LogRegBias, MonatoneLogReg
 from baselines import BasicModel, OptimisedModel
 from datasets import (Dataset, Adult, Bank, Blood, balanced_batches,
-                      California, Diabetes, Heart, Jungle, Car)
+                      California, Diabetes, Heart, Jungle, Car, CreditG)
 
 
 def monat_single(data, lam, bias, mask):
@@ -16,19 +16,7 @@ def monat_single(data, lam, bias, mask):
     clf = MonatoneLogReg(steps=100, lam=lam, lr=0.02, bias=bias)
     clf.fit(X_train, y_train)
     acc, auc = clf.get_acc(X_test, y_test)
-    # clf.plot_net()
-    # print(clf.betas)
-    # print("Synthetic Test")
-    # xs_test = torch.arange(0, 1, 0.1)
-    # col_test = clf.monatone_map[0].forward(xs_test)
-    #
-    # print(col_test)
-    #
-    # print()
-    # beta_eff = col_test / torch.sqrt(xs_test ** 2 + 0.001)
-    #
-    # print(beta_eff)
-    # exit(5)
+
     return acc, auc
 
 
@@ -99,16 +87,14 @@ def eval_ordering(ds, col_no, size, train_size, n_trials=10):
 
 
 def main():
-    dl = Dataset(Jungle())
+    dl = Dataset(CreditG())
     cols = range(len(dl))
 
     print("Using columns:", dl.ds_prop.col_headers[cols])
     print()
 
-
-
     # List of models to evaluate
-    for size in [4, 8, 16, 32, 64, 128, 256, 512]:
+    for size in [2,4,8,16,32,64,128, 256, 512]:
         eval_ordering(dl, cols, size=size, train_size=size, n_trials=40)
 
 

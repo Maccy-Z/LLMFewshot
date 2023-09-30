@@ -7,20 +7,7 @@ import datetime
 from modified_LR import LogRegBias, MonatoneLogReg
 from baselines import BasicModel, OptimisedModel
 from datasets import (Dataset, Adult, Bank, Blood, balanced_batches,
-                      California, Diabetes, Heart, Jungle, Car)
-
-
-def monat_acc(data):
-    X_train, X_test, y_train, y_test = data
-
-    clf = MonatoneLogReg(steps=200, lam=0.5, lr=0.02)
-    clf.fit(X_train, y_train)
-    acc, auc = clf.get_acc(X_test, y_test)
-
-    print(f'Accuracy: {acc:.3g}, {auc = :.3g}')
-
-    clf.plot_net()
-    return acc, auc
+                      California, Diabetes, Heart, Jungle, Car, CreditG)
 
 
 # Evaluate LR with biases
@@ -72,7 +59,7 @@ def eval_ordering(ds, col_no, size, train_size, n_trials=10):
 
 
 def main():
-    dl = Dataset(Adult())
+    dl = Dataset(CreditG())
     cols = range(len(dl))
 
     print("Using columns:", dl.ds_prop.col_headers[cols])

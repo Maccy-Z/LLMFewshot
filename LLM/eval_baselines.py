@@ -7,7 +7,7 @@ import datetime, time
 from modified_LR import LogRegBias, MonatoneLogReg
 from baselines import BasicModel, OptimisedModel
 from datasets import (Dataset, Adult, Bank, Blood, balanced_batches,
-                      California, Diabetes, Heart, Jungle, Car)
+                      California, Diabetes, Heart, Jungle, Car, CreditG)
 
 # Evaluate model and fit hyperparameters
 def optim_acc(data, model):
@@ -88,7 +88,7 @@ def eval_ordering(model_list, ds, col_no, train_size, n_trials=10):
 
 def main():
     # TODO: Enter dataset here.
-    dl = Dataset(Adult())
+    dl = Dataset(CreditG())
     cols = range(len(dl))
 
     print("Using columns:", dl.ds_prop.col_headers[cols])
@@ -103,7 +103,7 @@ def main():
     ]
 
     for size in [4, 8, 16, 32, 64, 128, 256, 512]:
-        eval_ordering(model_list, dl, cols, train_size=size, n_trials=120)
+        eval_ordering(model_list, dl, cols, train_size=size, n_trials=20)
 
 
 if __name__ == "__main__":

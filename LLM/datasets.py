@@ -193,7 +193,7 @@ class California:
         median = data['median_house_value'].median()
         data['median_house_value'] = data['median_house_value'].apply(lambda x: 1 if x > median else 0)
         data = data.dropna()
-        #[print(c) for c in data.columns]
+        # [print(c) for c in data.columns]
         return data
 
 
@@ -248,7 +248,7 @@ class Car:
         self.col_headers = data.columns
         self.col_to_head = {i: h for i, h in enumerate(self.col_headers)}
         self.col_to_dtype = {i: d for i, d in enumerate(self.col_dtypes)}
-        #print(data.to_numpy())
+        # print(data.to_numpy())
         return data
 
 
@@ -298,7 +298,7 @@ class Diabetes:
 
     def read_csv(self):
         data = pd.read_csv(self.filename)
-        #data.drop("Outcome", axis=1, inplace=True)  # drop the label
+        # data.drop("Outcome", axis=1, inplace=True)  # drop the label
         self.col_dtypes = map_dtypes_to_py_types(data.dtypes.values)
         self.col_headers = data.columns
         self.col_to_head = {i: h for i, h in enumerate(self.col_headers)}
@@ -359,7 +359,7 @@ class Heart:
 
     def read_csv(self):
         data = pd.read_csv(self.filename)
-        #data.drop('HeartDisease', axis=1, inplace=True)  # drop the label
+        # data.drop('HeartDisease', axis=1, inplace=True)  # drop the label
         self.col_dtypes = map_dtypes_to_py_types(data.dtypes.values)
         self.col_headers = data.columns
         self.col_to_head = {i: h for i, h in enumerate(self.col_headers)}
@@ -410,7 +410,7 @@ class Jungle:
     def read_csv(self):
         data = arff.loadarff(self.filename)
         data = pd.DataFrame(data[0])
-        #data.drop('class', axis=1, inplace=True)  # drop the label
+        # data.drop('class', axis=1, inplace=True)  # drop the label
         self.col_dtypes = map_dtypes_to_py_types(data.dtypes.values)
         self.col_headers = data.columns
         self.col_to_head = {i: h for i, h in enumerate(self.col_headers)}
@@ -451,7 +451,7 @@ def map_dtypes_to_py_types(column_dtypes):
 class Dataset:
     def __init__(self, ds_prop):
         self.ds_prop = ds_prop
-        data_2d_array = ds_prop.read_csv()#[:-1]
+        data_2d_array = ds_prop.read_csv()  # [:-1]
         data = np.array(data_2d_array)
 
         self.data = data
@@ -486,7 +486,6 @@ class Dataset:
         ordered_data = np.array(ordered_data, dtype=float)
 
         return ordered_data
-
 
     def get_unnormaliesd(self, col_no):
         xs = self.data[:, col_no]
@@ -604,14 +603,114 @@ def analyse_dataset(ds, col):
     print()
     print()
 
-    for x in ds.ds_prop.ordered_labels[col]:
-        idx = (ds.data[:, col] == x)
-        print(f"{x}: {np.mean(ds.num_data[idx, -1]):.3g}")
+    try:
+        for x in ds.ds_prop.ordered_labels[col]:
+            idx = (ds.data[:, col] == x)
+            print(f"{x}: {np.mean(ds.num_data[idx, -1]):.3g}")
+    except Exception as e:
+        return
+
+
+class CreditG:
+    filename = "./creditg/creditg.arff"
+    col_headers = np.array(
+        [
+            "checking_status",
+            "duration",
+            "credit_history",
+            "purpose",
+            "amount",
+            "savings_status",
+            "employ_years",
+            "install_percent_income",
+            "relationship",
+            "other_debtors",
+            "residence_since",
+            "property",
+            "age",
+            "other_install_plans",
+            "housing",
+            "num_credits",
+            "job",
+            "dependents",
+            "telephone",
+            "foreign_worker",
+        ]
+    )
+
+    # ChatGPT-4 generated orderings:
+    ordered_labels = {
+        0: ["<0", "0<=X<200", "no checking", ">=200"],
+        2: ["no credits/all paid", 'all paid', "existing paid", "delayed previously", "critical/other existing credit"],
+        3: ['business', 'education', 'retraining',  'new car',  'used car', 'other', 'repairs', 'furniture/equipment', 'radio/tv','domestic appliance',],
+        5: [ 'no known savings', '<100', '100<=X<500', '500<=X<1000', '>=1000',],
+        6: ['unemployed', '<1', '1<=X<4', '4<=X<7', '>=7'],
+        8: ['male div/sep', 'female div/dep/mar', 'male single', 'male mar/wid'],
+        9: ['guarantor', 'co applicant', 'none', ],
+        11: ['life insurance', 'real estate', 'car', 'no known property'], # No idea
+        13: ['none', 'bank', 'stores'],
+        14: ['own','rent', 'for free'],
+        16: ['unemp/unskilled non res', 'unskilled resident', 'skilled', 'high qualif/self emp/mgmt']
+
+
+        }
+
+    # Good=1, bad=0. So positive correlation means good credit rating
+    correl_coef = {
+        0: 1,
+        1: -1,
+        2: 1,
+        3: 1,
+        4: -1,
+        5: 1,
+        6: 1,
+        7: -1,
+        8: 1,
+        9: -1,
+        10: 1,
+        11: 0,
+        12: 1,
+        13: 1,
+        14: -1,
+        15: 0,
+        16: 1,
+        17: 0,
+        18: 1,
+        19: 0
+    }
+
+    # Process data
+
+    correl_mask = np.array(
+        [1 if coef is not None else 0 for coef in correl_coef.values()]
+    )
+    correl_coef = {
+        c: coef if coef is not None else 0 for c, coef in correl_coef.items()
+    }
+
+    def read_csv(self):
+        data = arff.loadarff(self.filename)
+        data = pd.DataFrame(data[0])
+
+        byte_columns = data.select_dtypes([object]).columns[data.select_dtypes([object]).applymap(type).eq(bytes).all()]
+        for col in byte_columns:
+            data[col] = data[col].str.decode('utf-8')
+
+        # data.drop('class', axis=1, inplace=True)  # drop the label
+        self.col_dtypes = map_dtypes_to_py_types(data.dtypes.values)
+        self.col_dtypes[-1] = int
+        self.col_headers = data.columns
+        self.col_to_head = {i: h for i, h in enumerate(self.col_headers)}
+        self.col_to_dtype = {i: d for i, d in enumerate(self.col_dtypes)}
+
+        # for d in enumerate(self.col_dtypes):
+        #     print(d)
+        data['class'] = data['class'].map({'good': 1, 'bad': 0})
+        return data
 
 
 if __name__ == "__main__":
-    ds = Dataset(California())
-    x = ds.get_unnormaliesd(range(9))
-    print(x[1])
-
-    analyse_dataset(ds, col=7)
+    ds = Dataset(CreditG())
+    COL_NO = 18
+    print(list(set(list(ds.get_unnormaliesd(COL_NO).squeeze()))))
+    analyse_dataset(ds, col=COL_NO)
