@@ -65,10 +65,10 @@ def eval_ordering(model_list, ds, col_no, train_size, n_trials=10):
             results.append(["raw", a, auc, std])
         if "order" in eval_types:
             a, auc, std = optim_acc(ord_data, model_type)
-            results.append(["raw", a, auc, std])
+            results.append(["order", a, auc, std])
         if "onehot" in eval_types:
             a, auc, std = optim_acc(onehot_data, model_type)
-            results.append(["raw", a, auc, std])
+            results.append(["onehot", a, auc, std])
 
         print(f'{model_type}')
         for r in results:
@@ -83,12 +83,12 @@ def eval_ordering(model_list, ds, col_no, train_size, n_trials=10):
             for r in results:
                 print(f'{train_size} {r[2]:.3g}')
 
-                f.write(f'{r[0]} {train_size} {r[1]:.3g}, {r[2]:.3g}, {r[3]:.3g}\n')
+                f.write(f'{r[0]} {type(ds.ds_prop).__name__} {train_size} {r[1]:.3g}, {r[2]:.3g}, {r[3]:.3g}\n')
 
 
 def main():
     # TODO: Enter dataset here.
-    dl = Dataset(Adult())
+    dl = Dataset(Diabetes())
     cols = range(len(dl))
 
     print("Using columns:", dl.ds_prop.col_headers[cols])
@@ -96,10 +96,10 @@ def main():
 
     # List of models to evaluate
     model_list = [
-        # ("LightGBM", ["raw", "order", "onehot"]),
-        # ("LR", ['raw', "order", "onehot"]),
-        # ("XGBoost", ["raw", "order", "onehot"]),
-        ("TabPFN", ["raw", "order", "onehot"]),
+        ("LightGBM", ["raw", "order", "onehot"]),
+        ("LR", ['raw', "order", "onehot"]),
+        ("XGBoost", ["raw", "order", "onehot"]),
+        # ("TabPFN", ["raw", "order", "onehot"]),
     ]
 
     for size in [4, 8, 16, 32, 64, 128, 256, 512]:
