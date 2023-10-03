@@ -28,7 +28,7 @@ def monat_acc_mp(data, size, bias: torch.Tensor = None, mask: torch.Tensor = Non
         bias = torch.zeros(X_train.shape[1])
     bias.requires_grad = False
     mask.requires_grad = False
-    lam = 0.1 / np.sqrt(size)
+    lam = 0.0 / np.sqrt(size)
 
     args = [(batch, lam, bias, mask) for batch in data[1:]]
     with Pool(8) as p:
@@ -94,7 +94,7 @@ def main():
     print()
 
     # List of models to evaluate
-    for size in [2,4,8,16,32,64,128, 256, 512]:
+    for size in [512]:
         eval_ordering(dl, cols, size=size, train_size=size, n_trials=40)
 
 
