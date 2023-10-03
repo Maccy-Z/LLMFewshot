@@ -1,2 +1,0 @@
-train = ["adult"]
-test = ["adult"]
