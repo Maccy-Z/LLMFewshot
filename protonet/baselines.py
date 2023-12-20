@@ -1,6 +1,6 @@
 # Evaluate models on batches. Do the actual accuracy evaluation.
 
-import os, toml, random
+import os, toml, random, pickle, warnings
 import numpy as np
 from scipy import stats
 from abc import ABC, abstractmethod
@@ -11,11 +11,16 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier as KNN
 from sklearn.ensemble import RandomForestClassifier
+# from pytorch_tabnet.tab_model import TabNetClassifier
 from catboost import CatBoostClassifier, CatboostError
+from tab_transformer_pytorch import FTTransformer
 
+from main import *
 from config import Config, load_config
 from precompute_batches import load_batch
 
+# sys.path.append('/mnt/storage_ssd/fewshot_learning/FairFewshot/STUNT_main')
+# from STUNT_interface import STUNT_utils, MLPProto
 
 BASEDIR = '.'
 max_batches = 40
