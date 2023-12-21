@@ -12,31 +12,31 @@ class Config:
     # Dataloader properties
     fix_per_label: bool = True  # Fix N_meta per label instead of total
     N_meta: int = 5  # N rows in meta
-    N_target: int = 5  # N rows in target
+    N_target: int = 15  # N rows in target
 
     normalise: bool = True  # Normalise predictors
 
-    # Train DL params
+    # Eval params
     DS_DIR: str = './datasets'
     ds_group: str = '0'  # Datasets to sample from. List or filename
-    bs: int = 8
-    N_batches: int = 100
+    bs: int = 400     # Batch size
+    N_batches: int = 1
 
     # Model parameters
     proto_dim: int = 256
 
     # RNGs
-    seed: int = None
-
-    # Optimiser parameters
-    lr: float = 3e-4  # 5e-4
-    eps: float = 0.1e-4  # 3e-4
-    w_decay: float = 1e-4
+    seed: int = 2
 
     def __post_init__(self):
-        self.RNG = np.random.default_rng()
         self.T_RNG = torch.Generator()
-        #self.T_RNG.manual_seed()
+
+        if self.seed is None:
+            self.T_RNG.seed()
+            self.RNG = np.random.default_rng()
+        else:
+            self.T_RNG.manual_seed(self.seed)
+            self.RNG = np.random.default_rng(self.seed)
 
 
 def save_config(cfg: Config, save_file):

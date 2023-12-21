@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import os
 from itertools import islice
-import toml
+from baselines import BasicModel
 
 from config import Config
 
@@ -43,13 +43,13 @@ def sample(n, k):
 class MyDataSet:
     cfg: Config
 
-    def __init__(self, cfg, ds_name, split, testing, dtype=torch.float32, device="cpu"):
+    def __init__(self, cfg, ds_name, split, dtype=torch.float32, device="cpu"):
         self.cfg, self.RNG = cfg, cfg.RNG
 
         self.ds_name = ds_name
         self.device = device
         self.dtype = dtype
-        self.testing = testing
+        # self.all_cols = all_cols
 
         """
         Dataset format: {folder}_py.dat             predictors
@@ -105,7 +105,6 @@ class MyDataSet:
         # Sort data by label
         self.data = {}
 
-        # Include labels that have enough entries. If there are less than 2 valid labels, discard dataset.
         for label in labels:
             mask = (position == label)
             label_data = data[mask]
@@ -135,6 +134,7 @@ class MyDataSet:
             if label in wanted_labels:
                 # Draw rows and shuffle to make meta and target batch
                 idx = torch.randperm(label_rows.size(0), generator=self.cfg.T_RNG)[: N_meta + N_target]
+
                 rows = label_rows[idx]
                 meta_rows = rows[:N_meta]
                 target_rows = rows[N_meta:]
@@ -152,9 +152,6 @@ class MyDataSet:
             xs_meta = (xs_meta - mean) / (std + 1e-8)
             xs_target = (xs_target - mean) / (std + 1e-8)
 
-        # xs_meta = torch.ones_like(xs_meta) * ys_meta.unsqueeze(-1)
-        # xs_target = torch.ones_like(xs_target) * ys_target.unsqueeze(-1)
-
         return xs_meta, ys_meta.to(int), xs_target, ys_target.to(int)
 
     def __repr__(self):
@@ -165,25 +162,21 @@ class MyDataSet:
 
 
 class SplitDataloader:
-    def __init__(self, cfg: Config, bs, dataset, testing, device="cpu"):
+    def __init__(self, cfg: Config, dataset, all_cols, device="cpu"):
         """
-        :param bs: Number of datasets to sample from each batch
-        :param datasets: Which datasets to sample from.
+        :param dataset: Which datasets to sample from.
             If None: All datasets
             If -1, sample all available datasets
             If strings, sample from that specified dataset(s).
-        :param ds_split: If ds_group is int >= 0, the test or train split.
         """
-        assert isinstance(testing, bool)
         self.cfg, self.RNG = cfg, cfg.RNG
-        self.bs = bs
-        self.testing = testing
+        self.all_cols = all_cols
         self.device = device
 
         ds_dir = f'{cfg.DS_DIR}/data/'
 
         try:
-            self.ds = MyDataSet(cfg, dataset, testing=self.testing, device=self.device, split="all")
+            self.ds = MyDataSet(cfg, dataset, device=self.device, split="all")
         except ValueError as e:
             print(f'Not sampling dataset {dataset} for reason: ')
             print(e)
@@ -195,13 +188,9 @@ class SplitDataloader:
         while True:
 
             # Number of columns to sample dataset. Testing always uses full dataset
-            if self.testing:
-                N_cols = self.ds.tot_cols - 1
-            else:
-                sample_ds = self.RNG.choice(self.all_datasets, size=self.bs)  # Allow repeats.
-                max_num_cols = min([d.tot_cols for d in sample_ds])  # - 1
-                N_cols = self.RNG.integers(3, max_num_cols)
-
+            N_cols = self.ds.tot_cols - 1
+            if not self.all_cols:
+                N_cols = self.RNG.choice(N_cols)  # Allow repeats.
             xs_meta, ys_meta, xs_target, ys_target = list(zip(*[
                 self.ds.sample(N_cols=N_cols) for _ in range(self.cfg.bs)]))
 
@@ -214,14 +203,14 @@ class SplitDataloader:
 
 
 if __name__ == "__main__":
-    # torch.manual_seed(0)
     cfg = Config()
-    cfg.max_labels = 2
-    RNG = cfg.RNG
 
-    dl = SplitDataloader(cfg, bs=1, dataset="adult", testing=True)
+    dl = SplitDataloader(cfg, dataset="adult", all_cols=True)
+    model = BasicModel("KNN")
 
     # print(dl.all_datasets[0].num_labels)
+    for mp, ml, tp, tl, N_label in islice(dl, 5):
+        # mp, ml, tp, tl = mp[0], ml[0], tp[0], tl[0]
 
-    for mp, ml, tp, tl, N_label in islice(dl, 1):
-        print(ml)
+        acc, _ = model.get_accuracy([mp, ml, tp, tl, None])
+        print(acc)

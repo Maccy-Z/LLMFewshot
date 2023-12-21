@@ -11,22 +11,17 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier as KNN
 from sklearn.ensemble import RandomForestClassifier
-# from pytorch_tabnet.tab_model import TabNetClassifier
 from catboost import CatBoostClassifier, CatboostError
-from tab_transformer_pytorch import FTTransformer
 
-from main import *
 from config import Config, load_config
-from precompute_batches import load_batch
 
-# sys.path.append('/mnt/storage_ssd/fewshot_learning/FairFewshot/STUNT_main')
-# from STUNT_interface import STUNT_utils, MLPProto
 
 BASEDIR = '.'
-max_batches = 40
 
 
 class Model(ABC):
+    max_batches = 1000
+
     # Process batch of data
     def get_accuracy(self, batch):
         xs_metas, ys_metas, xs_targets, ys_targets, _ = batch
@@ -39,7 +34,7 @@ class Model(ABC):
             accs.append(a)
 
             batch_no += 1
-            if batch_no > max_batches:
+            if batch_no > self.max_batches:
                 break
 
         accs = np.concatenate(accs)
@@ -57,154 +52,6 @@ class Model(ABC):
         pass
 
 
-#
-# class STUNT(STUNT_utils, Model):
-#     model: torch.nn.Module
-#
-#     def __init__(self):
-#         self.lr = 0.0001
-#         self.model_size = (1024, 1024)  # num_cols, out_dim, hid_dim
-#         self.steps = 5
-#         self.tasks_per_batch = 4
-#         self.test_num_way = 2
-#         self.query = 1
-#         self.kmeans_iter = 5
-#
-#     def fit(self, xs_meta, ys_meta):
-#         self.shot = (xs_meta.shape[0] - 2) // 2
-#         ys_meta = ys_meta.flatten().long()
-#
-#         # Reset the model
-#         self.model = MLPProto(xs_meta.shape[-1], self.model_size[0], self.model_size[1])
-#         self.optim = torch.optim.Adam(self.model.parameters(), lr=self.lr)
-#         with warnings.catch_warnings():
-#             # warnings.simplefilter("ignore")
-#             for _ in range(self.steps):
-#                 try:
-#                     train_batch = self.get_batch(xs_meta.clone())
-#                     self.protonet_step(train_batch)
-#                 except NameError as e:
-#                     pass
-#
-#         with torch.no_grad():
-#             meta_embed = self.model(xs_meta)
-#
-#         self.prototypes = self.get_prototypes(meta_embed.unsqueeze(0), ys_meta.unsqueeze(0), 2)
-#
-#     def get_acc(self, xs_target, ys_target):
-#         self.model.eval()
-#         with torch.no_grad():
-#             support_target = self.model(xs_target)
-#
-#         self.prototypes = self.prototypes[0]
-#         support_target = support_target.unsqueeze(1)
-#
-#         sq_distances = torch.sum((self.prototypes
-#                                   - support_target) ** 2, dim=-1)
-#
-#         # print(sq_distances.shape)
-#         _, preds = torch.min(sq_distances, dim=-1)
-#
-#         # print(preds.numpy(), ys_target.numpy())
-#         return (preds == ys_target).numpy()
-#
-#
-# class TabnetModel(Model):
-#     def __init__(self):
-#         self.model = TabNetClassifier(device_name="cpu")
-#         self.bs = 64
-#         self.patience = 17
-#
-#     def fit(self, xs_meta, ys_meta):
-#         ys_meta = ys_meta.flatten().float().numpy()
-#         xs_meta = xs_meta.numpy()
-#
-#         if ys_meta.min() == ys_meta.max():
-#             self.identical_batch = True
-#             self.pred_val = ys_meta[0]
-#         else:
-#             self.identical_batch = False
-#
-#             sys.stdout = open(os.devnull, "w")
-#             with warnings.catch_warnings():
-#                 warnings.simplefilter("ignore")
-#
-#                 try:
-#                     # self.model.fit(xs_meta, ys_meta, drop_last=False)
-#                     self.model.fit(xs_meta, ys_meta,
-#                                    eval_name=["accuracy"], eval_set=[(xs_meta, ys_meta)],
-#                                    batch_size=self.bs, patience=self.patience, drop_last=False)
-#                 except RuntimeError:
-#                     # Tabnet fails if multiple columns are exactly identical. Add a irrelevant amount of random noise to stop this.
-#                     xs_meta += np.random.normal(size=xs_meta.shape) * 1e-6
-#                     print(xs_meta)
-#                     self.model.fit(xs_meta, ys_meta,
-#                                    eval_set=[(xs_meta, ys_meta)], eval_name=["accuracy"],
-#                                    batch_size=self.bs, patience=self.patience, drop_last=False)
-#
-#             sys.stdout = sys.__stdout__
-#
-#             self.pred_val = None
-#
-#     def get_acc(self, xs_target, ys_target):
-#         if self.identical_batch:
-#             predictions = np.ones_like(ys_target) * self.pred_val
-#         else:
-#             with torch.no_grad():
-#                 predictions = self.model.predict(X=xs_target)
-#
-#         ys_lr_target_labels = np.array(predictions).flatten()
-#
-#         return ys_lr_target_labels == np.array(ys_target)
-#
-#     def __repr__(self):
-#         return "TabNet"
-#
-#
-# class FTTrModel(Model):
-#     model: torch.nn.Module
-#
-#     def __init__(self):
-#         self.null_categ = torch.tensor([[]])
-#
-#     def fit(self, xs_meta, ys_meta):
-#         ys_meta = ys_meta.flatten().long()
-#         xs_meta = xs_meta
-#         # Reset the model
-#         self.model = FTTransformer(
-#             categories=(),  # tuple containing the number of unique values within each category
-#             num_continuous=xs_meta.shape[-1],  # number of continuous values
-#             dim=24,  # dimension, paper set at 32
-#             dim_out=2,  # binary prediction, but could be anything
-#             depth=4,  # depth, paper recommended 6
-#             heads=2,  # heads, paper recommends 8
-#             attn_dropout=0.1,  # post-attention dropout
-#             # ff_dropout=0.1  # feed forward dropout
-#         )
-#
-#         optim = torch.optim.Adam(self.model.parameters(), lr=2.25e-3)
-#
-#         for _ in range(30):
-#             x_categ = torch.tensor([[]])
-#             clf = self.model(x_categ, xs_meta)
-#
-#             loss = torch.nn.functional.cross_entropy(clf, ys_meta.squeeze())
-#             loss.backward()
-#             optim.step()
-#             optim.zero_grad()
-#
-#     def get_acc(self, xs_target, ys_target):
-#         self.model.eval()
-#         with torch.no_grad():
-#             target_preds = self.model(self.null_categ, xs_target)
-#         preds = torch.argmax(target_preds, dim=1)
-#
-#         return (preds == ys_target).numpy()
-#
-#     def __repr__(self):
-#         return "FTTransformer"
-#
-#
 class BasicModel(Model):
     def __init__(self, name):
         match name:
@@ -215,10 +62,7 @@ class BasicModel(Model):
             case "KNN":
                 self.model = KNN(n_neighbors=2, p=1, weights="distance")
             case "CatBoost":
-                self.model = CatBoostClassifier(iterations=200, learning_rate=0.03, allow_const_label=True, verbose=False)
-                # iterations=20, depth=4, learning_rate=0.5,
-                #                             loss_function='Logloss', allow_const_label=True, verbose=False)
-
+                self.model = CatBoostClassifier(iterations=100, learning_rate=0.03, allow_const_label=True, verbose=False)
             case "R_Forest":
                 self.model = RandomForestClassifier(n_estimators=150, n_jobs=5)
             case _:
@@ -239,8 +83,6 @@ class BasicModel(Model):
 
             try:
                 self.model.fit(xs_meta, ys_meta)
-                # print(self.model.get_all_params())
-                # exit(2)
             except CatboostError:
                 # Catboost fails if every input element is the same
                 self.identical_batch = True
@@ -258,59 +100,6 @@ class BasicModel(Model):
 
     def __repr__(self):
         return self.name
-
-
-class FLAT(Model):
-    def __init__(self, load_no, save_ep=None):
-        save_dir = f'{BASEDIR}/saves/save_{load_no}'
-        print(f'Loading model at {save_dir = }')
-
-        if save_ep is None:
-            state_dict = torch.load(f'{save_dir}/model.pt')
-        else:
-            state_dict = torch.load(f'{save_dir}/model_{save_ep}.pt')
-
-        cfg = load_config(f'{save_dir}/config.toml')
-
-        self.model = ModelHolder(cfg=cfg)
-        self.model.load_state_dict(state_dict['model_state_dict'])
-
-    def get_accuracy(self, batch):
-        xs_metas, ys_metas, xs_targets, ys_targets, _ = batch
-        accs = []
-
-        xs_metas, ys_metas, xs_targets, ys_targets = xs_metas[:max_batches + 1], ys_metas[:max_batches + 1], xs_targets[:max_batches + 1], ys_targets[
-                                                                                                                                           :max_batches + 1]
-        self.fit(xs_metas, ys_metas)
-        a = self.get_acc(xs_targets, ys_targets)
-        accs.append(a)
-
-        accs = np.concatenate(accs)
-
-        mean, std = np.mean(accs), np.std(accs, ddof=1) / np.sqrt(accs.shape[0])
-
-        return mean, std
-
-    def fit(self, xs_meta, ys_meta):
-        self.unique_ys_meta = np.unique(ys_meta)
-
-        with torch.no_grad():
-            self.pos_enc = self.model.forward_meta(xs_meta, ys_meta)
-
-    def get_acc(self, xs_target, ys_target) -> np.array:
-
-        unique_target = np.unique(ys_target)
-        unique_labels = np.union1d(self.unique_ys_meta, unique_target)
-        max_N_label = np.max(unique_labels) + 1
-
-        with torch.no_grad():
-            ys_pred_targ = self.model.forward_target(xs_target, self.pos_enc, max_N_label)
-        predicted_labels = torch.argmax(ys_pred_targ, dim=1)
-
-        return torch.eq(predicted_labels, ys_target.flatten()).numpy()
-
-    def __repr__(self):
-        return "FLAT"
 
 
 #
@@ -545,24 +334,9 @@ def main(load_no, N_meta):
     cfg.N_target = N_target
 
     models = [FLAT(num) for num in load_no] + [BasicModel("LR"), BasicModel("R_Forest")]
-    # [FLAT_MAML(num) for num in load_no] + \
-    #  [
-    #  BasicModel("LR"), # BasicModel("CatBoost"), BasicModel("R_Forest"),  BasicModel("KNN"),
-    #  # TabnetModel(),
-    #  # FTTrModel(),
-    #  # STUNT(),
-    #  ]
 
     test_results = get_results_by_dataset(test_datasets, models, N_meta=N_meta, N_target=N_target)
 
     process_results(test_results)
 
 
-if __name__ == "__main__":
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-
-    main(load_no=[-1], N_meta=5)
-
-    # -1        58.34±0.34        NaN  64.27±0.33  64.18±0.33     -5.93            nan

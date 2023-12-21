@@ -1,11 +1,13 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import numpy as np
 import itertools
 import time
 
 from config import Config
 from dataloader import SplitDataloader
+from baselines import BasicModel
 
 
 class ResBlock(nn.Module):
@@ -36,15 +38,56 @@ class ResBlock(nn.Module):
         return out, x
 
 
+class SimpleMLP(nn.Module):
+    def __init__(self, cfg, layer_sizes):
+        super(SimpleMLP, self).__init__()
+
+        # Fix RNG init
+        torch.manual_seed(cfg.seed)
+
+        self.layers = nn.ModuleList()
+
+        # Create layers based on the sizes provided
+        for i in range(len(layer_sizes) - 1):
+            self.layers.append(nn.Linear(layer_sizes[i], layer_sizes[i + 1]))
+
+        for l in self.layers:
+            #nn.init.xavier_normal_(l.weight, gain=1.5)
+            nn.init.kaiming_normal_(l.weight, nonlinearity='tanh')
+
+        # nn.init.kaiming_normal_(self.layers[-1].weight, nonlinearity='linear')
+
+    def forward(self, x):
+        # Pass data through each layer except for the last one
+        for layer in self.layers[:-1]:
+            x = F.tanh(layer(x))
+
+        # No activation after the last layer
+        x = self.layers[-1](x)
+        return x
+
+
 class ProtoNet(nn.Module):
     def __init__(self, cfg):
         super().__init__()
         self.cfg = cfg
 
+        self.embed_model = SimpleMLP(cfg, [14, 5000, 5000, 15000])
+        self.embed_model.to('cuda')
+
     # From observations, generates latent embeddings
     def to_embedding(self, xs):
-        # Pass through GNN -> average -> final linear
-        return xs
+        print()
+        xs = torch.stack(xs)        # shape = [BS, N, N_cols]
+        xs = xs.to('cuda')
+        # print(xs[0])
+        # print(xs.shape)
+        xs = self.embed_model(xs)   # shape = [BS, N, embed_dim]
+        # print(xs[0])
+        print(torch.std(xs))
+        # exit(2)
+
+        return xs.cpu()
 
     # Given meta embeddings and labels, generate prototypes
     def gen_prototypes(self, xs_meta, ys_metas):
@@ -65,7 +108,7 @@ class ProtoNet(nn.Module):
 
     # Compare targets to prototypes
     def forward(self, xs_targ, max_N_label):
-        targ_embeds = self.to_embedding(xs_targ)
+        targ_embeds = self.to_embedding(xs_targ)  # shape = [BS, N_targ, embed_dim]
 
         # Loop over batches
         all_probs = []
@@ -75,18 +118,19 @@ class ProtoNet(nn.Module):
             # repeat targets: [1, 1, 2, 2, 3, 3]
 
             labels, prototypes = protos.keys(), protos.values()
-            labels, prototypes = list(labels), list(prototypes)
+            labels, prototypes = list(labels), list(prototypes)  # prototypes.shape = [N_class, embed_dim]
 
             N_class = len(protos)
             N_targs = len(targ_embed)
 
             prototypes = torch.stack(prototypes)
-            prototypes = torch.tile(prototypes, (N_targs, 1))
+            prototypes = torch.tile(prototypes, (N_targs, 1))  # Shape = [N_targ * N_class, embed_dim]
 
-            test = torch.repeat_interleave(targ_embed, N_class, dim=-2)
+            test = torch.repeat_interleave(targ_embed, N_class, dim=-2)  # Shape = [N_targ * N_class, embed_dim]
 
             # Calc distance and get probs
             distances = -torch.norm(test - prototypes, dim=-1)
+            # distances = torch.dot(test, prototypes.T)
             distances = distances.reshape(N_targs, N_class)
             probs = torch.nn.Softmax(dim=-1)(distances)
 
@@ -97,6 +141,7 @@ class ProtoNet(nn.Module):
             all_probs.append(true_probs)
 
         all_probs = torch.concatenate(all_probs)
+
         return all_probs
 
 
@@ -122,31 +167,39 @@ class ModelHolder(nn.Module):
 
 
 def main(cfg: Config, nametag=None):
-    dl = SplitDataloader(cfg, bs=cfg.bs, dataset='adult', testing=True)
+    dl = SplitDataloader(cfg, dataset='adult', all_cols=True)
 
     print()
     print("Training data names:", dl)
 
     model = ModelHolder(cfg=cfg)
 
+    # Baseline Model
+    cb_base = BasicModel("LR")
+
     accs = []
-    for xs_meta, ys_meta, xs_target, ys_target, max_N_label in itertools.islice(dl, cfg.N_batches):
-        # Second pass using previous embedding and train weight encoder
+    base_mean, base_std = 0., 0.
+    for batch in itertools.islice(dl, cfg.N_batches):
+        xs_meta, ys_meta, xs_target, ys_target, max_N_label = batch
+
+        # Eval model
         model.forward_meta(xs_meta, ys_meta)
         ys_pred_targ = model.forward_target(xs_target, max_N_label)
-
-        # Accuracy recording
+        # Accuracy
         ys_target = torch.cat(ys_target)
         predicted_labels = torch.argmax(ys_pred_targ, dim=1)
         accuracy = torch.eq(predicted_labels, ys_target).sum().item() / len(ys_target)
-
         accs.append(accuracy)
+
+        # Baseline accuracy
+        base_mean, base_std = cb_base.get_accuracy(batch)
+
+    print(f'Baseline accuracy: {base_mean * 100:.2f}% +- {base_std * 100:.2f}%')
 
     print(f"Training accuracy : {np.mean(accs) * 100:.2f}%")
 
 
 if __name__ == "__main__":
-    # torch.manual_seed(0)
     tag = ""  # input("Description: ")
 
     for test_no in range(1):
