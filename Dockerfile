@@ -9,7 +9,9 @@ RUN pip install matplotlib scipy pandas scikit-learn tabulate
 RUN pip install catboost
 RUN pip install seaborn
 RUN pip install toml
-
+RUN pip install tabpfn
+RUN pip install xgboost
+RUN pip install lightgbm
 
 
 

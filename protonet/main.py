@@ -9,6 +9,7 @@ from config import Config
 from dataloader import SplitDataloader
 from baselines import BasicModel
 
+x = torch.tensor(1, device='cuda')
 
 class ResBlock(nn.Module):
     def __init__(self, in_size, hid_size, out_size, n_blocks, out_relu=True):
@@ -52,18 +53,17 @@ class SimpleMLP(nn.Module):
             self.layers.append(nn.Linear(layer_sizes[i], layer_sizes[i + 1]))
 
         for l in self.layers:
-            #nn.init.xavier_normal_(l.weight, gain=1.5)
             nn.init.kaiming_normal_(l.weight, nonlinearity='tanh')
 
-        # nn.init.kaiming_normal_(self.layers[-1].weight, nonlinearity='linear')
-
     def forward(self, x):
-        # Pass data through each layer except for the last one
-        for layer in self.layers[:-1]:
-            x = F.tanh(layer(x))
+        with torch.no_grad():
+            # Pass data through each layer except for the last one
+            for layer in self.layers[:-1]:
+                x = F.tanh(layer(x) * 0.4)
+                print(torch.mean(x), torch.std(x))
 
-        # No activation after the last layer
-        x = self.layers[-1](x)
+            # No activation after the last layer
+            x = self.layers[-1](x)
         return x
 
 
@@ -72,22 +72,15 @@ class ProtoNet(nn.Module):
         super().__init__()
         self.cfg = cfg
 
-        self.embed_model = SimpleMLP(cfg, [14, 5000, 5000, 15000])
+        self.embed_model = SimpleMLP(cfg, [14, 5000, 10000, 20000])
         self.embed_model.to('cuda')
 
     # From observations, generates latent embeddings
     def to_embedding(self, xs):
-        print()
         xs = torch.stack(xs)        # shape = [BS, N, N_cols]
         xs = xs.to('cuda')
-        # print(xs[0])
-        # print(xs.shape)
-        xs = self.embed_model(xs)   # shape = [BS, N, embed_dim]
-        # print(xs[0])
-        print(torch.std(xs))
-        # exit(2)
-
-        return xs.cpu()
+        xs = self.embed_model.forward(xs)   # shape = [BS, N, embed_dim]
+        return xs #.cpu()
 
     # Given meta embeddings and labels, generate prototypes
     def gen_prototypes(self, xs_meta, ys_metas):
@@ -135,7 +128,8 @@ class ProtoNet(nn.Module):
             probs = torch.nn.Softmax(dim=-1)(distances)
 
             # Probs are in order of protos.keys(). Map to true classes.
-            true_probs = torch.zeros([N_targs, max_N_label], dtype=torch.float32)
+            true_probs = torch.zeros([N_targs, max_N_label], dtype=torch.float32, device='cuda')
+
             true_probs[:, labels] = probs
 
             all_probs.append(true_probs)
@@ -158,12 +152,7 @@ class ModelHolder(nn.Module):
     def forward_target(self, xs_target, max_N_label):
         preds = self.protonet.forward(xs_target, max_N_label)
 
-        return preds.view(-1, max_N_label)
-
-    def loss_fn(self, preds, targs):
-        targs = torch.cat(targs)
-        cross_entropy = torch.nn.functional.cross_entropy(preds, targs)
-        return cross_entropy
+        return preds.view(-1, max_N_label).cpu()
 
 
 def main(cfg: Config, nametag=None):
@@ -175,7 +164,7 @@ def main(cfg: Config, nametag=None):
     model = ModelHolder(cfg=cfg)
 
     # Baseline Model
-    cb_base = BasicModel("LR")
+    # cb_base = BasicModel("KNN")
 
     accs = []
     base_mean, base_std = 0., 0.
@@ -188,15 +177,17 @@ def main(cfg: Config, nametag=None):
         # Accuracy
         ys_target = torch.cat(ys_target)
         predicted_labels = torch.argmax(ys_pred_targ, dim=1)
-        accuracy = torch.eq(predicted_labels, ys_target).sum().item() / len(ys_target)
-        accs.append(accuracy)
+        accuracy = torch.eq(predicted_labels, ys_target).numpy()
+        accs += [accuracy]
 
         # Baseline accuracy
-        base_mean, base_std = cb_base.get_accuracy(batch)
+        # base_mean, base_std = cb_base.get_accuracy(batch)
 
-    print(f'Baseline accuracy: {base_mean * 100:.2f}% +- {base_std * 100:.2f}%')
+    # print(f'Baseline accuracy: {base_mean * 100:.2f}% +- {base_std * 100:.2f}%')
+    accs = np.concatenate(accs)
+    acc, std = np.mean(accs), np.std(accs) / np.sqrt(accs.shape[0])
 
-    print(f"Training accuracy : {np.mean(accs) * 100:.2f}%")
+    print(f"Training accuracy : {acc * 100:.2f} +- {std * 100:.2f}")
 
 
 if __name__ == "__main__":

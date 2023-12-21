@@ -146,11 +146,13 @@ class MyDataSet:
         ys_meta, ys_target = metas[:, -1], targets[:, -1]
         xs_meta, xs_target = metas[:, pred_cols], targets[:, pred_cols]
 
-        if self.cfg.normalise:
+        if self.cfg.norm_targ:
             all_data = torch.cat([xs_meta, xs_target])
-            std, mean = torch.std_mean(all_data, dim=0)
-            xs_meta = (xs_meta - mean) / (std + 1e-8)
-            xs_target = (xs_target - mean) / (std + 1e-8)
+        else:
+            all_data = xs_meta
+        std, mean = torch.std_mean(all_data, dim=0)
+        xs_meta = (xs_meta - mean) / (std + 1e-8)
+        xs_target = (xs_target - mean) / (std + 1e-8)
 
         return xs_meta, ys_meta.to(int), xs_target, ys_target.to(int)
 
@@ -162,7 +164,7 @@ class MyDataSet:
 
 
 class SplitDataloader:
-    def __init__(self, cfg: Config, dataset, all_cols, device="cpu"):
+    def __init__(self, cfg: Config, dataset, all_cols=True, device="cpu"):
         """
         :param dataset: Which datasets to sample from.
             If None: All datasets
@@ -183,7 +185,7 @@ class SplitDataloader:
 
     def __iter__(self):
         """
-        :return: [bs, num_rows, num_cols], [bs, num_rows, 1]
+        :return: [bs, num_rows, num_cols], [bs, num_rows]
         """
         while True:
 
