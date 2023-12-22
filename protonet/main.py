@@ -58,7 +58,7 @@ class SimpleMLP(nn.Module):
         with torch.no_grad():
             # Pass data through each layer except for the last one
             for layer in self.layers[:-1]:
-                x = F.tanh(layer(x) * 0.3)
+                x = F.tanh(layer(x) * 1)
                 print(torch.mean(x), torch.std(x))
 
             # No activation after the last layer
@@ -71,7 +71,7 @@ class ProtoNet(nn.Module):
         super().__init__()
         self.cfg = cfg
 
-        self.embed_model = SimpleMLP(cfg, [14, 10000, 10000, 20000])
+        self.embed_model = SimpleMLP(cfg, [14, 2048, 4096])
         self.embed_model.to('cuda')
 
     # From observations, generates latent embeddings
