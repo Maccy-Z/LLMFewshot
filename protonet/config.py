@@ -11,16 +11,17 @@ import toml
 class Config:
     # Dataloader properties
     fix_per_label: bool = True  # Fix N_meta per label instead of total
-    N_meta: int = 128  # N rows in meta
+    N_meta: int = 256  # N rows in meta
     N_target: int = 10  # N rows in target
 
-    norm_targ: bool = False  # Normalise predictors
+    norm_targ: bool = False
+    # Normalise predictors
 
     # Eval params
     DS_DIR: str = './datasets'
     ds_group: str = '0'  # Datasets to sample from. List or filename
-    bs: int = 256     # Batch size
-    N_batches: int = 8 # Number of batches to sample
+    bs: int = 128     # Batch size
+    N_batches: int = 1 # Number of batches to sample
 
     # Model parameters
     proto_dim: int = 256

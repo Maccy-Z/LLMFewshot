@@ -29,7 +29,7 @@ class SimpleMLP(nn.Module):
         with torch.no_grad():
             # Pass data through each layer except for the last one
             for layer in self.layers[:-1]:
-                x = F.tanh(layer(x) * 1)
+                x = F.tanh(layer(x) * 0.3)
                 # print(torch.mean(x), torch.std(x))
 
             # No activation after the last layer
@@ -44,7 +44,7 @@ class ProtoNet:
     def __init__(self, cfg):
         self.cfg = cfg
 
-        self.embed_model = SimpleMLP(cfg, [14, 10000, 20000])
+        self.embed_model = SimpleMLP(cfg, [16, 10000, 10000])
         self.embed_model.to('cuda')
 
     # Generate latent embeddings
@@ -62,7 +62,7 @@ class ProtoNet:
         self.batch_clf, self.batch_masks = [], []
         for embed_meta, ys_meta in zip(embed_metas, ys_metas, strict=True):
             # clf = LogisticRegression(penalty='l1', C=1, solver='liblinear') #
-            lasso_clf = Lasso(alpha=0.01)
+            lasso_clf = Lasso(alpha=0.001)
             lasso_clf.fit(embed_meta.cpu(), ys_meta.cpu())
 
             coefs = lasso_clf.coef_.squeeze()
@@ -96,7 +96,7 @@ class ProtoNet:
 
 
 def main(cfg: Config, nametag=None):
-    dl = SplitDataloader(cfg, dataset='adult', all_cols=True)
+    dl = SplitDataloader(cfg, dataset='bank', all_cols=True)
 
     print()
     print("Training data names:", dl)

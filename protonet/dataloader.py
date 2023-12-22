@@ -150,9 +150,10 @@ class MyDataSet:
             all_data = torch.cat([xs_meta, xs_target])
         else:
             all_data = xs_meta
+
         std, mean = torch.std_mean(all_data, dim=0)
-        xs_meta = (xs_meta - mean) / (std + 1e-8)
-        xs_target = (xs_target - mean) / (std + 1e-8)
+        xs_meta = (xs_meta - mean) / (std + 1e-3)
+        xs_target = (xs_target - mean) / (std + 1e-3)
 
         return xs_meta, ys_meta.to(int), xs_target, ys_target.to(int)
 
@@ -207,12 +208,13 @@ class SplitDataloader:
 if __name__ == "__main__":
     cfg = Config()
 
-    dl = SplitDataloader(cfg, dataset="adult", all_cols=True)
+    dl = SplitDataloader(cfg, dataset="bank")
     model = BasicModel("KNN")
 
     # print(dl.all_datasets[0].num_labels)
     for mp, ml, tp, tl, N_label in islice(dl, 5):
         # mp, ml, tp, tl = mp[0], ml[0], tp[0], tl[0]
+
 
         acc, _ = model.get_accuracy([mp, ml, tp, tl, None])
         print(acc)

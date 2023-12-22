@@ -4,7 +4,7 @@ from sklearn.metrics import roc_auc_score
 import torch
 import itertools
 
-from base_optim import BasicModel, OptimisedModel
+from base_optim import OptimisedModel
 from dataloader import SplitDataloader
 from config import Config
 from cprint import c_print
@@ -75,12 +75,12 @@ def main():
     # List of models to evaluate
     model_list = ["CatBoost", ]
 
-    for N_meta in [128]:
+    for N_meta in [64]:
         cfg = Config()
 
         cfg.N_meta = N_meta
         cfg.bs = 118
-        ds = SplitDataloader(cfg, dataset='adult')
+        ds = SplitDataloader(cfg, dataset='bank')
         eval_ordering(model_list, ds, cfg)
 
 

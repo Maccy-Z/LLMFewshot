@@ -51,69 +51,6 @@ class Model(ABC):
     def get_acc(self, xs_target, ys_target) -> np.array:
         pass
 
-
-class BasicModel(Model):
-    def __init__(self, name):
-        match name:
-            case "LR":
-                self.model = LogisticRegression(max_iter=1000)
-            case "SVC":
-                self.model = SVC(C=20, kernel="sigmoid", gamma='scale')
-            case "KNN":
-                self.model = KNN(n_neighbors=5, p=1, weights="distance")
-            case "CatBoost":
-                self.model = CatBoostClassifier(iterations=500, learning_rate=0.03, allow_const_label=True, verbose=False, auto_class_weights='Balanced')
-            case "R_Forest":
-                self.model = RandomForestClassifier(n_estimators=150, n_jobs=5)
-            case "XGBoost":
-                self.model = XGBClassifier(n_estimators=150, n_jobs=8)
-            case "TabPFN":
-                self.model = TabPFNClassifier(device="cpu", N_ensemble_configurations=32)
-            case _:
-                raise Exception("Invalid model specified")
-
-        self.name = name
-        self.identical_batch = False
-
-    def fit(self, xs_meta, ys_meta):
-        ys_meta = ys_meta.flatten()
-        xs_meta = xs_meta
-        if ys_meta.min() == ys_meta.max():
-            print("Catboost error")
-
-            self.identical_batch = True
-            self.pred_val = ys_meta[0]
-        else:
-            self.identical_batch = False
-
-            try:
-                self.model.fit(xs_meta, ys_meta)
-            except CatboostError:
-                # Catboost fails if every input element is the same
-                self.identical_batch = True
-                mode = stats.mode(ys_meta, keepdims=False)[0]
-                self.pred_val = mode
-
-    def get_acc(self, xs_target, ys_target):
-        xs_target = xs_target
-        if self.identical_batch:
-            predictions = np.ones_like(ys_target) * self.pred_val
-        else:
-            predictions = self.model.predict(xs_target)
-
-        return np.array(predictions).flatten() == np.array(ys_target)
-
-    def predict_proba(self, xs_target):
-        if self.identical_batch:
-            return np.ones([xs_target.shape[0], 2]) * 0.5
-        else:
-            return self.model.predict_proba(xs_target)
-
-    def __repr__(self):
-        return self.name
-
-
-# Fit model parameters on validation set
 class OptimisedModel(Model):
     param_grid: dict
     best_params: dict

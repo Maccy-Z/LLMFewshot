@@ -3,13 +3,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 import itertools
-import time
 
 from config import Config
 from dataloader import SplitDataloader
-from baselines import BasicModel
-
-
 
 
 class SimpleMLP(nn.Module):
@@ -29,14 +25,15 @@ class SimpleMLP(nn.Module):
         for l in self.layers:
             nn.init.kaiming_normal_(l.weight, nonlinearity='tanh')
 
+        # self.last_layers = nn.ModuleList([nn.Linear(layer_sizes[-2] // 10, layer_sizes[-1] // 10) for _ in range(10)])
+
     def forward(self, x):
         with torch.no_grad():
             # Pass data through each layer except for the last one
             for layer in self.layers[:-1]:
-                x = layer(x) * 0.3
-                x = F.tanh(x)
+                x = layer(x)
                 print(torch.mean(x), torch.std(x))
-            # No activation after the last layer
+                x = F.tanh(x)
             x = self.layers[-1](x)
         return x
 
@@ -45,7 +42,7 @@ class ProtoNet:
     def __init__(self, cfg):
         self.cfg = cfg
 
-        self.embed_model = SimpleMLP(cfg, [14, 5000, 10000])
+        self.embed_model = SimpleMLP(cfg, [14, 3000, 3000, 3000])
         self.embed_model.to('cuda')
 
     # Generate latent embeddings
@@ -109,22 +106,6 @@ class ProtoNet:
         all_probs = torch.concatenate(all_probs)
 
         return all_probs.cpu()
-
-
-# class ModelHolder(nn.Module):
-#     def __init__(self, cfg):
-#         super().__init__()
-#
-#         self.protonet = ProtoNet(cfg=cfg)
-#
-#     # Forward Meta set and train
-#     def forward_meta(self, xs_meta, ys_meta):
-#         self.protonet.gen_prototypes(xs_meta, ys_meta)
-#
-#     def forward_target(self, xs_target, max_N_label):
-#         preds = self.protonet.forward(xs_target, max_N_label)
-#
-#         return preds.view(-1, max_N_label).cpu()
 
 
 def main(cfg: Config, nametag=None):
