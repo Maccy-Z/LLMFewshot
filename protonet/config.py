@@ -26,7 +26,7 @@ class Config:
     proto_dim: int = 256
 
     # RNGs
-    seed: int = 3
+    seed: int = 1
 
     def __post_init__(self):
         self.T_RNG = torch.Generator()

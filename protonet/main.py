@@ -9,7 +9,6 @@ from config import Config
 from dataloader import SplitDataloader
 from baselines import BasicModel
 
-x = torch.tensor(1, device='cuda')
 
 class ResBlock(nn.Module):
     def __init__(self, in_size, hid_size, out_size, n_blocks, out_relu=True):
@@ -59,7 +58,7 @@ class SimpleMLP(nn.Module):
         with torch.no_grad():
             # Pass data through each layer except for the last one
             for layer in self.layers[:-1]:
-                x = F.tanh(layer(x) * 0.4)
+                x = F.tanh(layer(x) * 0.3)
                 print(torch.mean(x), torch.std(x))
 
             # No activation after the last layer
@@ -72,7 +71,7 @@ class ProtoNet(nn.Module):
         super().__init__()
         self.cfg = cfg
 
-        self.embed_model = SimpleMLP(cfg, [14, 5000, 10000, 20000])
+        self.embed_model = SimpleMLP(cfg, [14, 10000, 10000, 20000])
         self.embed_model.to('cuda')
 
     # From observations, generates latent embeddings

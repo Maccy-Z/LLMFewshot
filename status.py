@@ -8,3 +8,6 @@ import torch
 print("Pytorch version:", torch.__version__)
 print("GPU available:", torch.cuda.is_available())
 x = torch.tensor(1, device='cuda')
+
+from cprint import c_print
+c_print("hi", color="bright_red")

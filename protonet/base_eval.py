@@ -7,7 +7,7 @@ import itertools
 from base_optim import BasicModel, OptimisedModel
 from dataloader import SplitDataloader
 from config import Config
-from utils import c_print
+from cprint import c_print
 
 
 # Evaluate model and fit hyperparameters
@@ -70,8 +70,6 @@ def eval_ordering(model_list, data, cfg):
 
 
 def main():
-    # TODO: Enter dataset here.
-
     print()
 
     # List of models to evaluate
@@ -81,7 +79,7 @@ def main():
         cfg = Config()
 
         cfg.N_meta = N_meta
-        cfg.bs = 101
+        cfg.bs = 118
         ds = SplitDataloader(cfg, dataset='adult')
         eval_ordering(model_list, ds, cfg)
 
