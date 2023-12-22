@@ -1,6 +1,6 @@
 import torch
 
-from main import ModelHolder
+from run import ModelHolder
 import numpy as np
 from config import load_config
 

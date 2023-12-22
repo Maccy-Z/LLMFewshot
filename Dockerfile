@@ -12,6 +12,6 @@ RUN pip install toml
 RUN pip install tabpfn
 RUN pip install xgboost
 RUN pip install lightgbm
-RUN pip install git+https://github.com/Maccy-Z/c_print
+RUN pip install git+https://github.com/Maccy-Z/c_print.git
 
 

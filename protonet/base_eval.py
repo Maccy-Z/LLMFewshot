@@ -75,7 +75,7 @@ def main():
     # List of models to evaluate
     model_list = ["CatBoost", ]
 
-    for N_meta in [128, 256, 512]:
+    for N_meta in [128]:
         cfg = Config()
 
         cfg.N_meta = N_meta

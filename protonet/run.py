@@ -10,37 +10,12 @@ from dataloader import SplitDataloader
 from baselines import BasicModel
 
 
-class ResBlock(nn.Module):
-    def __init__(self, in_size, hid_size, out_size, n_blocks, out_relu=True):
-        super().__init__()
-        self.out_relu = out_relu
-
-        self.res_modules = nn.ModuleList([])
-        self.lin_in = nn.Linear(in_size, hid_size)
-
-        for _ in range(n_blocks - 2):
-            self.res_modules.append(nn.Linear(hid_size, hid_size))
-
-        self.lin_out = nn.Linear(hid_size, out_size)
-
-        self.act = nn.ReLU()
-
-    def forward(self, x):
-        x = self.lin_in(x)
-        for layer in self.res_modules:
-            x_r = self.act(layer(x))
-            x = x + x_r
-
-        if self.out_relu:
-            out = self.act(self.lin_out(x))
-        else:
-            out = self.lin_out(x)
-        return out, x
 
 
 class SimpleMLP(nn.Module):
     def __init__(self, cfg, layer_sizes):
         super(SimpleMLP, self).__init__()
+        self.cfg = cfg
 
         # Fix RNG init
         torch.manual_seed(cfg.seed)
@@ -58,32 +33,31 @@ class SimpleMLP(nn.Module):
         with torch.no_grad():
             # Pass data through each layer except for the last one
             for layer in self.layers[:-1]:
-                x = F.tanh(layer(x) * 1)
+                x = layer(x) * 0.3
+                x = F.tanh(x)
                 print(torch.mean(x), torch.std(x))
-
             # No activation after the last layer
             x = self.layers[-1](x)
         return x
 
 
-class ProtoNet(nn.Module):
+class ProtoNet:
     def __init__(self, cfg):
-        super().__init__()
         self.cfg = cfg
 
-        self.embed_model = SimpleMLP(cfg, [14, 2048, 4096])
+        self.embed_model = SimpleMLP(cfg, [14, 5000, 10000])
         self.embed_model.to('cuda')
 
-    # From observations, generates latent embeddings
-    def to_embedding(self, xs):
-        xs = torch.stack(xs)        # shape = [BS, N, N_cols]
+    # Generate latent embeddings
+    def _to_embedding(self, xs):
+        xs = torch.stack(xs)  # shape = [BS, N, N_cols]
         xs = xs.to('cuda')
-        xs = self.embed_model.forward(xs)   # shape = [BS, N, embed_dim]
-        return xs #.cpu()
+        xs = self.embed_model.forward(xs)  # shape = [BS, N, embed_dim]
+        return xs
 
     # Given meta embeddings and labels, generate prototypes
-    def gen_prototypes(self, xs_meta, ys_metas):
-        embed_metas = self.to_embedding(xs_meta)
+    def fit(self, xs_meta, ys_metas):
+        embed_metas = self._to_embedding(xs_meta)
 
         # Seperate out batches
         self.batch_protos = []
@@ -99,8 +73,8 @@ class ProtoNet(nn.Module):
             self.batch_protos.append(prototypes)
 
     # Compare targets to prototypes
-    def forward(self, xs_targ, max_N_label):
-        targ_embeds = self.to_embedding(xs_targ)  # shape = [BS, N_targ, embed_dim]
+    def predict_proba(self, xs_targ, max_N_label):
+        targ_embeds = self._to_embedding(xs_targ)  # shape = [BS, N_targ, embed_dim]
 
         # Loop over batches
         all_probs = []
@@ -122,7 +96,6 @@ class ProtoNet(nn.Module):
 
             # Calc distance and get probs
             distances = -torch.norm(test - prototypes, dim=-1)
-            # distances = torch.dot(test, prototypes.T)
             distances = distances.reshape(N_targs, N_class)
             probs = torch.nn.Softmax(dim=-1)(distances)
 
@@ -135,23 +108,23 @@ class ProtoNet(nn.Module):
 
         all_probs = torch.concatenate(all_probs)
 
-        return all_probs
+        return all_probs.cpu()
 
 
-class ModelHolder(nn.Module):
-    def __init__(self, cfg):
-        super().__init__()
-
-        self.protonet = ProtoNet(cfg=cfg)
-
-    # Forward Meta set and train
-    def forward_meta(self, xs_meta, ys_meta):
-        self.protonet.gen_prototypes(xs_meta, ys_meta)
-
-    def forward_target(self, xs_target, max_N_label):
-        preds = self.protonet.forward(xs_target, max_N_label)
-
-        return preds.view(-1, max_N_label).cpu()
+# class ModelHolder(nn.Module):
+#     def __init__(self, cfg):
+#         super().__init__()
+#
+#         self.protonet = ProtoNet(cfg=cfg)
+#
+#     # Forward Meta set and train
+#     def forward_meta(self, xs_meta, ys_meta):
+#         self.protonet.gen_prototypes(xs_meta, ys_meta)
+#
+#     def forward_target(self, xs_target, max_N_label):
+#         preds = self.protonet.forward(xs_target, max_N_label)
+#
+#         return preds.view(-1, max_N_label).cpu()
 
 
 def main(cfg: Config, nametag=None):
@@ -160,7 +133,7 @@ def main(cfg: Config, nametag=None):
     print()
     print("Training data names:", dl)
 
-    model = ModelHolder(cfg=cfg)
+    model = ProtoNet(cfg=cfg)
 
     # Baseline Model
     # cb_base = BasicModel("KNN")
@@ -170,9 +143,8 @@ def main(cfg: Config, nametag=None):
     for batch in itertools.islice(dl, cfg.N_batches):
         xs_meta, ys_meta, xs_target, ys_target, max_N_label = batch
 
-        # Eval model
-        model.forward_meta(xs_meta, ys_meta)
-        ys_pred_targ = model.forward_target(xs_target, max_N_label)
+        model.fit(xs_meta, ys_meta)
+        ys_pred_targ = model.predict_proba(xs_target, max_N_label)
         # Accuracy
         ys_target = torch.cat(ys_target)
         predicted_labels = torch.argmax(ys_pred_targ, dim=1)
